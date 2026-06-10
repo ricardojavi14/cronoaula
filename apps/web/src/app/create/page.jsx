@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -973,9 +973,9 @@ export default function CreateSessionPage() {
 
       {/* ADVANCED */}
       {tab === "advanced" && (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-2 space-y-5">
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-5">
               <h3 className="font-bold text-slate-600 text-xs uppercase tracking-wide flex items-center gap-2">
                 <FileText size={13} /> Datos de la sesión
               </h3>
@@ -1057,7 +1057,7 @@ export default function CreateSessionPage() {
                 </F>
               </div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-5">
               <h3 className="font-bold text-slate-600 text-xs uppercase tracking-wide flex items-center gap-2">
                 <BookOpen size={13} /> Información pedagógica
               </h3>
@@ -1105,10 +1105,10 @@ export default function CreateSessionPage() {
                   }
                 />
               </F>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-4">
                 <F label="Adaptación DUA">
                   <textarea
-                    rows={2}
+                    rows={4}
                     className={ta}
                     placeholder="Ajustes para acceso, participación o expresión..."
                     value={meta.dua}
@@ -1117,7 +1117,7 @@ export default function CreateSessionPage() {
                 </F>
                 <F label="Metacognición">
                   <textarea
-                    rows={2}
+                    rows={4}
                     className={ta}
                     placeholder="Preguntas para reflexionar sobre lo aprendido..."
                     value={meta.metacognition}
@@ -1379,7 +1379,7 @@ function MomentsEditor({
   showAdv = false,
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
           <Layers size={15} className="text-slate-400" /> Momentos pedagógicos
@@ -1388,7 +1388,7 @@ function MomentsEditor({
           {moments.length} momentos
         </span>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {moments.map((m, mi) => {
           const mc = m.color || MC[mi % MC.length];
           const isE = exp[mi];
@@ -1477,7 +1477,7 @@ function MomentsEditor({
                 </button>
               </div>
               {isE && (
-                <div className="px-4 pb-3 pt-2 space-y-2 bg-white">
+                <div className="px-4 pb-4 pt-3 space-y-3 bg-white">
                   {m.submoments.length === 0 && (
                     <p className="text-xs text-slate-400 text-center py-3">
                       Sin actividades — agrega submomentos abajo
@@ -1486,38 +1486,55 @@ function MomentsEditor({
                   {m.submoments.map((sm, si) => (
                     <div
                       key={sm.id}
-                      className="flex gap-3 items-start p-3 bg-slate-50 rounded-xl border border-slate-100"
+                      className="flex gap-3 items-start p-4 bg-slate-50 rounded-2xl border border-slate-200"
                     >
                       <div
                         className="w-1.5 h-1.5 rounded-full shrink-0 mt-2"
                         style={{ backgroundColor: mc }}
                       />
-                      <div className="flex-1 space-y-1.5 min-w-0">
+                      <div className="flex-1 space-y-3 min-w-0">
                         <input
-                          className="w-full text-sm font-semibold text-slate-800 bg-transparent outline-none border-b border-transparent focus:border-slate-300"
-                          value={sm.name}
-                          placeholder="Nombre de la actividad"
+                          className="w-full text-sm font-bold text-slate-800 bg-transparent outline-none border-b border-transparent focus:border-slate-300"
+                          value={
+                            sm.name === "Actividades del momento" ||
+                            sm.name === "Actividad principal"
+                              ? "Actividad de aprendizaje"
+                              : sm.name
+                          }
+                          placeholder="Actividad de aprendizaje"
                           onChange={(e) => updS(mi, si, "name", e.target.value)}
                         />
                         {showAdv && (
-                          <>
-                            <input
-                              className="w-full text-xs text-slate-500 bg-transparent outline-none border-b border-transparent focus:border-slate-200"
-                              placeholder="Descripción breve..."
-                              value={sm.description}
-                              onChange={(e) =>
-                                updS(mi, si, "description", e.target.value)
-                              }
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                              Descripción de la actividad
+                            </label>
+                            <textarea
+                              rows={3}
+                              className="w-full resize-none rounded-xl bg-white border border-slate-200 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-800 outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-slate-400"
+                              placeholder="Describe qué harán el docente y los estudiantes..."
+                              value={sm.description || sm.teacher_note || ""}
+                              onChange={(e) => {
+                                updS(mi, si, "description", e.target.value);
+                                if (!sm.teacher_note || sm.teacher_note === sm.description) {
+                                  updS(mi, si, "teacher_note", e.target.value);
+                                }
+                              }}
                             />
-                            <input
-                              className="w-full text-xs text-amber-700 bg-transparent outline-none border-b border-transparent focus:border-amber-200"
-                              placeholder="💬 Tu nota docente (solo la ves tú)..."
-                              value={sm.teacher_note}
-                              onChange={(e) =>
-                                updS(mi, si, "teacher_note", e.target.value)
-                              }
-                            />
-                          </>
+                            {sm.teacher_note &&
+                              sm.description &&
+                              sm.teacher_note !== sm.description && (
+                                <textarea
+                                  rows={2}
+                                  className="w-full resize-none rounded-xl bg-amber-50 border border-amber-100 px-3.5 py-2 text-xs leading-relaxed text-amber-900 outline-none focus:ring-2 focus:ring-amber-300 focus:border-transparent"
+                                  placeholder="Nota docente opcional..."
+                                  value={sm.teacher_note}
+                                  onChange={(e) =>
+                                    updS(mi, si, "teacher_note", e.target.value)
+                                  }
+                                />
+                              )}
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -1567,3 +1584,4 @@ function MomentsEditor({
     </div>
   );
 }
+
