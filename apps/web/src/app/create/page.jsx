@@ -66,6 +66,44 @@ function F({ label, children }) {
   );
 }
 
+function AutoGrowTextarea({
+  value,
+  onChange,
+  className,
+  rows = 3,
+  maxHeight = 220,
+  expanded = true,
+  ...props
+}) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const nextHeight = expanded
+      ? Math.min(el.scrollHeight, maxHeight)
+      : Math.min(el.scrollHeight, rows * 24 + 28);
+    el.style.height = `${Math.max(nextHeight, rows * 24 + 20)}px`;
+    el.style.overflowY = expanded && el.scrollHeight > nextHeight ? "auto" : "hidden";
+  }, [value, rows, maxHeight, expanded]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={rows}
+      value={value}
+      onChange={onChange}
+      className={className}
+      {...props}
+    />
+  );
+}
+
+function isLongText(text = "") {
+  return String(text).length > 240 || String(text).split("\n").length > 4;
+}
+
 function calcMomentsTotal(list = []) {
   return list.reduce((total, moment) => {
     const subs = Array.isArray(moment.submoments) ? moment.submoments : [];
@@ -197,8 +235,9 @@ function normalizeImportedMoments(list = []) {
     submoments: (moment.submoments || []).map((submoment) => ({
       ...submoment,
       name:
-        submoment.name === "Actividades del momento"
-          ? "Actividad principal"
+        submoment.name === "Actividades del momento" ||
+        submoment.name === "Actividad principal"
+          ? "Actividad de aprendizaje"
           : submoment.name,
     })),
   }));
@@ -233,6 +272,7 @@ export default function CreateSessionPage() {
   const [iTxt, setITxt] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [prev, setPrev] = useState(null);
+  const [expandedPreviewActivities, setExpandedPreviewActivities] = useState({});
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -743,6 +783,9 @@ export default function CreateSessionPage() {
               <Layers size={15} className="text-slate-400" /> Momentos
               detectados ({prev.moments.length})
             </h3>
+            <p className="text-xs text-slate-500">
+              Puedes editar cada actividad antes de guardar.
+            </p>
             <div className="space-y-3">
               {prev.moments.map((m, mi) => {
                 const c = MC[mi % MC.length];
@@ -799,7 +842,7 @@ export default function CreateSessionPage() {
                               className="flex-1 text-sm font-semibold text-slate-800 bg-transparent outline-none border-b border-transparent focus:border-slate-300"
                               value={
                                 sm.name === "Actividades del momento"
-                                  ? "Actividad principal"
+                                  ? "Actividad de aprendizaje"
                                   : sm.name
                               }
                               onChange={(e) => {
@@ -828,10 +871,12 @@ export default function CreateSessionPage() {
                               min
                             </span>
                           </div>
-                          <textarea
-                            rows={2}
+                          <AutoGrowTextarea
+                            rows={4}
+                            maxHeight={260}
+                            expanded={Boolean(expandedPreviewActivities[`${mi}-${si}`])}
                             className="w-full resize-none rounded-xl bg-slate-50/70 border border-slate-200 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-                            placeholder="Describe o ajusta la actividad principal..."
+                            placeholder="Describe o ajusta la actividad de aprendizaje..."
                             value={sm.description || sm.teacher_note || ""}
                             onChange={(e) => {
                               const mo = [...prev.moments];
@@ -843,11 +888,21 @@ export default function CreateSessionPage() {
                               setPrev({ ...prev, moments: mo });
                             }}
                           />
-                          {(sm.description || sm.teacher_note) && (
-                            <p className="text-[11px] text-slate-500">
-                              Texto extraído del plan. Puedes editarlo antes de
-                              guardar.
-                            </p>
+                          {isLongText(sm.description || sm.teacher_note) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedPreviewActivities((current) => ({
+                                  ...current,
+                                  [`${mi}-${si}`]: !current[`${mi}-${si}`],
+                                }))
+                              }
+                              className="text-[11px] font-bold text-blue-600 hover:text-blue-700"
+                            >
+                              {expandedPreviewActivities[`${mi}-${si}`]
+                                ? "Ver menos"
+                                : "Ver completo"}
+                            </button>
                           )}
                         </div>
                       ))}
@@ -868,7 +923,7 @@ export default function CreateSessionPage() {
               onClick={confirmPrev}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-sm transition-colors"
             >
-              <Check size={15} /> Confirmar y editar sesión
+              <Check size={15} /> Continuar al editor
             </button>
           </div>
         </div>
@@ -1095,8 +1150,9 @@ export default function CreateSessionPage() {
                 />
               </F>
               <F label="Criterios">
-                <textarea
-                  rows={2}
+                <AutoGrowTextarea
+                  rows={3}
+                  maxHeight={260}
                   className={ta}
                   placeholder="Criterios de evaluación o logro..."
                   value={meta.criteria}
@@ -1107,8 +1163,9 @@ export default function CreateSessionPage() {
               </F>
               <div className="grid grid-cols-1 gap-4">
                 <F label="Adaptación DUA">
-                  <textarea
+                  <AutoGrowTextarea
                     rows={4}
+                    maxHeight={300}
                     className={ta}
                     placeholder="Ajustes para acceso, participación o expresión..."
                     value={meta.dua}
@@ -1116,8 +1173,9 @@ export default function CreateSessionPage() {
                   />
                 </F>
                 <F label="Metacognición">
-                  <textarea
+                  <AutoGrowTextarea
                     rows={4}
+                    maxHeight={300}
                     className={ta}
                     placeholder="Preguntas para reflexionar sobre lo aprendido..."
                     value={meta.metacognition}
@@ -1128,8 +1186,9 @@ export default function CreateSessionPage() {
                 </F>
               </div>
               <F label="Notas generales">
-                <textarea
-                  rows={2}
+                <AutoGrowTextarea
+                  rows={3}
+                  maxHeight={260}
                   className={ta}
                   placeholder="Recordatorios, estrategias..."
                   value={meta.notes}
@@ -1378,6 +1437,8 @@ function MomentsEditor({
   updS,
   showAdv = false,
 }) {
+  const [expandedActivities, setExpandedActivities] = useState({});
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
@@ -1509,8 +1570,10 @@ function MomentsEditor({
                             <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                               Descripción de la actividad
                             </label>
-                            <textarea
-                              rows={3}
+                            <AutoGrowTextarea
+                              rows={4}
+                              maxHeight={300}
+                              expanded={Boolean(expandedActivities[sm.id])}
                               className="w-full resize-none rounded-xl bg-white border border-slate-200 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-800 outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-slate-400"
                               placeholder="Describe qué harán el docente y los estudiantes..."
                               value={sm.description || sm.teacher_note || ""}
@@ -1521,11 +1584,28 @@ function MomentsEditor({
                                 }
                               }}
                             />
+                            {isLongText(sm.description || sm.teacher_note) && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedActivities((current) => ({
+                                    ...current,
+                                    [sm.id]: !current[sm.id],
+                                  }))
+                                }
+                                className="text-[11px] font-bold text-blue-600 hover:text-blue-700"
+                              >
+                                {expandedActivities[sm.id]
+                                  ? "Ver menos"
+                                  : "Ver completo"}
+                              </button>
+                            )}
                             {sm.teacher_note &&
                               sm.description &&
                               sm.teacher_note !== sm.description && (
-                                <textarea
+                                <AutoGrowTextarea
                                   rows={2}
+                                  maxHeight={180}
                                   className="w-full resize-none rounded-xl bg-amber-50 border border-amber-100 px-3.5 py-2 text-xs leading-relaxed text-amber-900 outline-none focus:ring-2 focus:ring-amber-300 focus:border-transparent"
                                   placeholder="Nota docente opcional..."
                                   value={sm.teacher_note}
