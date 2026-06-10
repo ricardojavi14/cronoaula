@@ -74,6 +74,100 @@ function calcMomentsTotal(list = []) {
   }, 0);
 }
 
+function textIncludes(value, pattern) {
+  return String(value || "").toLowerCase().includes(pattern);
+}
+
+function sessionText(meta = {}, moments = []) {
+  return [
+    meta.purpose,
+    meta.evidence,
+    meta.materials,
+    meta.notes,
+    meta.criteria,
+    meta.dua,
+    meta.evaluation,
+    meta.metacognition,
+    ...moments.flatMap((m) => [
+      m.name,
+      m.type,
+      ...(m.submoments || []).flatMap((sm) => [
+        sm.name,
+        sm.description,
+        sm.teacher_note,
+      ]),
+    ]),
+  ].join(" ");
+}
+
+function analyzeSession(meta = {}, moments = []) {
+  const totalDuration = Number(meta.total_duration) || 0;
+  const used = calcMomentsTotal(moments);
+  const diff = used - totalDuration;
+  const allText = sessionText(meta, moments).toLowerCase();
+  const hasMoment = (pattern) =>
+    moments.some((m) => textIncludes(`${m.name} ${m.type}`, pattern));
+  const cierre = moments.find((m) =>
+    textIncludes(`${m.name} ${m.type}`, "cierre"),
+  );
+  const cierreDuration = cierre ? calcMomentsTotal([cierre]) : 0;
+
+  const flags = {
+    inicio: hasMoment("inicio"),
+    desarrollo: hasMoment("desarrollo"),
+    cierre: Boolean(cierre),
+    purpose: Boolean(String(meta.purpose || "").trim()),
+    evidence: Boolean(String(meta.evidence || "").trim()),
+    metacognition:
+      Boolean(String(meta.metacognition || "").trim()) ||
+      textIncludes(allText, "metacog"),
+    dua: Boolean(String(meta.dua || "").trim()) || textIncludes(allText, "dua"),
+  };
+
+  const recommendations = [];
+  if (flags.inicio && flags.desarrollo && flags.cierre) {
+    recommendations.push("Tu sesion tiene estructura completa.");
+  }
+  if (!flags.cierre) {
+    recommendations.push("Agrega un cierre para consolidar aprendizajes.");
+  }
+  if (!flags.purpose) {
+    recommendations.push("No se detecto proposito de aprendizaje.");
+  }
+  if (!flags.evidence) {
+    recommendations.push("No se detecto evidencia o producto.");
+  }
+  if (!flags.dua) {
+    recommendations.push("No se detecto adaptacion DUA.");
+  }
+  if (flags.cierre && cierreDuration > 0 && cierreDuration < 5) {
+    recommendations.push(
+      "El cierre es muy breve; considera ampliarlo si haras metacognicion.",
+    );
+  }
+  if (diff === 0 && totalDuration > 0 && used > 0) {
+    recommendations.push("El tiempo esta completo.");
+  } else if (diff < 0) {
+    recommendations.push(
+      `Faltan ${Math.abs(diff)} min; agrega actividades o redistribuye tiempos.`,
+    );
+  } else if (diff > 0) {
+    recommendations.push(
+      `Sobran ${diff} min; reduce actividades o aumenta la duracion total.`,
+    );
+  }
+
+  return {
+    totalDuration,
+    used,
+    diff,
+    flags,
+    recommendations,
+    momentCount: moments.length,
+    canSave: Boolean(String(meta.title || "").trim()) && moments.length > 0,
+  };
+}
+
 function tpl2m(tpl) {
   return tpl.map((m, i) => ({
     ...m,
@@ -109,6 +203,10 @@ export default function CreateSessionPage() {
     purpose: "",
     evidence: "",
     materials: "",
+    criteria: "",
+    dua: "",
+    evaluation: "",
+    metacognition: "",
     notes: "",
   });
   const [moments, setMoments] = useState([]);
@@ -154,10 +252,14 @@ export default function CreateSessionPage() {
 
   const total = calcMomentsTotal(moments);
   const previewTotal = prev ? calcMomentsTotal(prev.moments) : 0;
-  const activeDuration = tab === "import" && iStep === "preview" && prev
+  const isPreviewing = tab === "import" && iStep === "preview" && prev;
+  const activeMeta = isPreviewing ? { ...meta, ...prev } : meta;
+  const activeMoments = isPreviewing ? prev.moments || [] : moments;
+  const review = analyzeSession(activeMeta, activeMoments);
+  const activeDuration = isPreviewing
     ? Number(prev.total_duration) || 0
     : Number(meta.total_duration) || 0;
-  const activeTotal = tab === "import" && iStep === "preview" && prev ? previewTotal : total;
+  const activeTotal = isPreviewing ? previewTotal : total;
   const timeDiff = activeTotal - activeDuration;
 
   const redis = () => {
@@ -251,21 +353,35 @@ export default function CreateSessionPage() {
       ),
     );
 
-  const handleSave = async () => {
-    if (!meta.title.trim()) return toast.error("El título es obligatorio");
+  const saveActiveSession = async ({ goToClass = false } = {}) => {
+    if (!String(activeMeta.title || "").trim())
+      return toast.error("El titulo es obligatorio");
+    if (!activeMoments.length)
+      return toast.error("Agrega al menos un momento antes de guardar");
     setSaving(true);
     try {
-      saveSession({ ...meta, teacher_id: teacher?.id || "local-teacher", moments });
+      const saved = saveSession({
+        ...activeMeta,
+        teacher_id: teacher?.id || "local-teacher",
+        moments: activeMoments,
+      });
       if (typeof window !== "undefined") localStorage.removeItem("cronoaula_draft");
       toast.success("Sesión guardada en este dispositivo");
-      setTimeout(() => { window.location.href = "/sessions"; }, 500);
+      setTimeout(() => {
+        window.location.href = goToClass ? `/class-mode/${saved.id}` : "/sessions";
+      }, 500);
+      return saved;
     } catch (error) {
       console.error(error);
       toast.error("No se pudo guardar en el navegador. Revisa el almacenamiento local.");
+      return null;
     } finally {
       setSaving(false);
     }
   };
+
+  const handleSave = async () => saveActiveSession();
+  const handleTryClass = async () => saveActiveSession({ goToClass: true });
 
   const handleAnalyze = async () => {
     if (!iTxt.trim()) return toast.error("Pega el texto de tu planificación");
@@ -308,6 +424,10 @@ export default function CreateSessionPage() {
       purpose: prev.purpose || m.purpose,
       evidence: prev.evidence || m.evidence,
       materials: prev.materials || m.materials,
+      criteria: prev.criteria || m.criteria,
+      dua: prev.dua || m.dua,
+      evaluation: prev.evaluation || m.evaluation,
+      metacognition: prev.metacognition || m.metacognition,
       notes: prev.notes || m.notes,
     }));
     setMoments(tpl2m(prev.moments));
@@ -405,9 +525,11 @@ export default function CreateSessionPage() {
         ))}
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+        <div className="min-w-0 space-y-4">
       {/* IMPORT PASTE */}
       {tab === "import" && iStep === "paste" && (
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="space-y-4">
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center shrink-0">
@@ -495,7 +617,7 @@ export default function CreateSessionPage() {
 
       {/* IMPORT PREVIEW */}
       {tab === "import" && iStep === "preview" && prev && (
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="space-y-4">
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
             <Check size={18} className="text-emerald-600 shrink-0 mt-0.5" />
             <div>
@@ -571,6 +693,27 @@ export default function CreateSessionPage() {
                   </F>
                 </div>
               )}
+              {[
+                ["Evidencia / producto", "evidence"],
+                ["Materiales / recursos", "materials"],
+                ["Criterios", "criteria"],
+                ["Adaptación DUA", "dua"],
+                ["Metacognición", "metacognition"],
+              ].map(([label, key]) => (
+                <div className="col-span-2" key={key}>
+                  <F label={label}>
+                    <textarea
+                      rows={2}
+                      className={ta}
+                      placeholder={`Completa ${label.toLowerCase()} si aplica...`}
+                      value={prev[key] || ""}
+                      onChange={(e) =>
+                        setPrev({ ...prev, [key]: e.target.value })
+                      }
+                    />
+                  </F>
+                </div>
+              ))}
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
@@ -621,39 +764,65 @@ export default function CreateSessionPage() {
                     </div>
                     <div className="px-4 py-2 space-y-1">
                       {m.submoments.map((sm, si) => (
-                        <div key={si} className="flex items-center gap-3 py-1">
-                          <div
-                            className="w-1.5 h-1.5 rounded-full shrink-0 opacity-60"
-                            style={{ backgroundColor: c }}
-                          />
-                          <input
-                            className="flex-1 text-sm text-slate-700 bg-transparent outline-none border-b border-transparent focus:border-slate-200"
-                            value={sm.name}
+                        <div
+                          key={si}
+                          className="rounded-xl border border-slate-100 bg-white p-3 space-y-2"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-1.5 h-1.5 rounded-full shrink-0 opacity-60"
+                              style={{ backgroundColor: c }}
+                            />
+                            <input
+                              className="flex-1 text-sm font-semibold text-slate-700 bg-transparent outline-none border-b border-transparent focus:border-slate-200"
+                              value={sm.name}
+                              onChange={(e) => {
+                                const mo = [...prev.moments];
+                                mo[mi].submoments[si] = {
+                                  ...sm,
+                                  name: e.target.value,
+                                };
+                                setPrev({ ...prev, moments: mo });
+                              }}
+                            />
+                            <input
+                              type="number"
+                              className="w-14 text-center text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1 outline-none"
+                              value={sm.duration}
+                              onChange={(e) => {
+                                const mo = [...prev.moments];
+                                mo[mi].submoments[si] = {
+                                  ...sm,
+                                  duration: parseInt(e.target.value) || 0,
+                                };
+                                setPrev({ ...prev, moments: mo });
+                              }}
+                            />
+                            <span className="text-xs text-slate-400 shrink-0">
+                              min
+                            </span>
+                          </div>
+                          <textarea
+                            rows={2}
+                            className="w-full resize-none rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-600 outline-none focus:ring-1 focus:ring-blue-400"
+                            placeholder="Contenido extraido para esta actividad..."
+                            value={sm.description || sm.teacher_note || ""}
                             onChange={(e) => {
                               const mo = [...prev.moments];
                               mo[mi].submoments[si] = {
                                 ...sm,
-                                name: e.target.value,
+                                description: e.target.value,
+                                teacher_note: e.target.value,
                               };
                               setPrev({ ...prev, moments: mo });
                             }}
                           />
-                          <input
-                            type="number"
-                            className="w-14 text-center text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1 outline-none"
-                            value={sm.duration}
-                            onChange={(e) => {
-                              const mo = [...prev.moments];
-                              mo[mi].submoments[si] = {
-                                ...sm,
-                                duration: parseInt(e.target.value) || 0,
-                              };
-                              setPrev({ ...prev, moments: mo });
-                            }}
-                          />
-                          <span className="text-xs text-slate-400 shrink-0">
-                            min
-                          </span>
+                          {(sm.description || sm.teacher_note) && (
+                            <p className="text-[11px] text-slate-400">
+                              Vista compacta: se muestran 2 lineas; puedes
+                              editar o ampliar el campo.
+                            </p>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -681,7 +850,7 @@ export default function CreateSessionPage() {
 
       {/* SIMPLE */}
       {tab === "simple" && (
-        <div className="max-w-3xl mx-auto space-y-4">
+        <div className="space-y-4">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <h2 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
               <Zap size={15} className="text-blue-600" /> Datos básicos
@@ -760,6 +929,15 @@ export default function CreateSessionPage() {
                 placeholder="¿Qué aprenderán los estudiantes hoy?"
                 value={meta.purpose}
                 onChange={(e) => setMeta({ ...meta, purpose: e.target.value })}
+              />
+            </F>
+            <F label="Evidencia / producto">
+              <textarea
+                rows={2}
+                className={ta}
+                placeholder="¿Qué producto o evidencia quedará al final?"
+                value={meta.evidence}
+                onChange={(e) => setMeta({ ...meta, evidence: e.target.value })}
               />
             </F>
           </div>
@@ -890,6 +1068,39 @@ export default function CreateSessionPage() {
                   }
                 />
               </F>
+              <F label="Criterios">
+                <textarea
+                  rows={2}
+                  className={ta}
+                  placeholder="Criterios de evaluación o logro..."
+                  value={meta.criteria}
+                  onChange={(e) =>
+                    setMeta({ ...meta, criteria: e.target.value })
+                  }
+                />
+              </F>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <F label="Adaptación DUA">
+                  <textarea
+                    rows={2}
+                    className={ta}
+                    placeholder="Ajustes para acceso, participación o expresión..."
+                    value={meta.dua}
+                    onChange={(e) => setMeta({ ...meta, dua: e.target.value })}
+                  />
+                </F>
+                <F label="Metacognición">
+                  <textarea
+                    rows={2}
+                    className={ta}
+                    placeholder="Preguntas para reflexionar sobre lo aprendido..."
+                    value={meta.metacognition}
+                    onChange={(e) =>
+                      setMeta({ ...meta, metacognition: e.target.value })
+                    }
+                  />
+                </F>
+              </div>
               <F label="Notas generales">
                 <textarea
                   rows={2}
@@ -916,21 +1127,21 @@ export default function CreateSessionPage() {
                   </span>
                 </div>
                 <div
-                  className={`flex justify-between font-bold ${diff === 0 ? "text-emerald-600" : diff > 0 ? "text-amber-600" : "text-red-600"}`}
+                  className={`flex justify-between font-bold ${timeDiff === 0 ? "text-emerald-600" : timeDiff > 0 ? "text-amber-600" : "text-red-600"}`}
                 >
                   <span>Diferencia</span>
-                  <span>{diff > 0 ? `+${diff}` : diff} min</span>
+                  <span>{timeDiff > 0 ? `+${timeDiff}` : timeDiff} min</span>
                 </div>
               </div>
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${diff === 0 ? "bg-emerald-500" : diff > 0 ? "bg-amber-500" : "bg-red-500"}`}
+                  className={`h-full rounded-full transition-all ${timeDiff === 0 ? "bg-emerald-500" : timeDiff > 0 ? "bg-amber-500" : "bg-red-500"}`}
                   style={{
                     width: `${Math.min(100, (total / (meta.total_duration || 1)) * 100)}%`,
                   }}
                 />
               </div>
-              {diff !== 0 && (
+              {timeDiff !== 0 && (
                 <button
                   onClick={redis}
                   className="w-full py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-xs font-bold hover:bg-amber-100 flex items-center justify-center gap-1.5"
@@ -945,6 +1156,15 @@ export default function CreateSessionPage() {
           </div>
         </div>
       )}
+        </div>
+        <SessionReviewPanel
+          review={review}
+          saving={saving}
+          onSave={handleSave}
+          onTryClass={handleTryClass}
+          onRedistribute={isPreviewing ? null : redis}
+        />
+      </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 z-20 shadow-lg">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -977,6 +1197,142 @@ export default function CreateSessionPage() {
         jsx
         global
       >{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
+
+function SessionReviewPanel({
+  review,
+  saving,
+  onSave,
+  onTryClass,
+  onRedistribute,
+}) {
+  const status =
+    review.diff === 0 && review.used > 0
+      ? "Tiempo completo"
+      : review.diff < 0
+        ? `Faltan ${Math.abs(review.diff)} min`
+        : `Sobran ${review.diff} min`;
+  const statusClass =
+    review.diff === 0 && review.used > 0
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : review.diff < 0
+        ? "bg-amber-50 text-amber-700 border-amber-200"
+        : "bg-red-50 text-red-700 border-red-200";
+
+  const checks = [
+    ["Inicio", review.flags.inicio],
+    ["Desarrollo", review.flags.desarrollo],
+    ["Cierre", review.flags.cierre],
+    ["Propósito", review.flags.purpose],
+    ["Evidencia/producto", review.flags.evidence],
+    ["Metacognición", review.flags.metacognition],
+    ["Adaptación DUA", review.flags.dua],
+  ];
+
+  return (
+    <aside className="xl:sticky xl:top-20 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-5">
+        <div>
+          <p className="text-xs font-bold text-blue-600 uppercase tracking-wide">
+            Revisión rápida
+          </p>
+          <h2 className="text-lg font-black text-slate-800">
+            Resumen inteligente
+          </h2>
+        </div>
+
+        <div className={`rounded-xl border px-3 py-2.5 ${statusClass}`}>
+          <p className="text-xs font-bold uppercase tracking-wide">Estado</p>
+          <p className="text-sm font-black">{status}</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <Metric label="Duración" value={`${review.totalDuration || 0}m`} />
+          <Metric label="Usado" value={`${review.used || 0}m`} />
+          <Metric label="Momentos" value={review.momentCount} />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+            Componentes pedagógicos
+          </p>
+          <div className="grid grid-cols-1 gap-1.5">
+            {checks.map(([label, ok]) => (
+              <div
+                key={label}
+                className="flex items-center justify-between gap-2 text-sm"
+              >
+                <span className="text-slate-600">{label}</span>
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${ok ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-400"}`}
+                >
+                  {ok ? <Check size={11} /> : <X size={11} />}
+                  {ok ? "Sí" : "No"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+            Recomendaciones
+          </p>
+          <div className="space-y-2">
+            {review.recommendations.map((item, idx) => (
+              <div
+                key={`${item}-${idx}`}
+                className="flex gap-2 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2"
+              >
+                <AlertCircle
+                  size={14}
+                  className="text-blue-500 shrink-0 mt-0.5"
+                />
+                <p className="text-xs leading-relaxed text-slate-600">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {onRedistribute && review.diff !== 0 && review.used > 0 && (
+          <button
+            onClick={onRedistribute}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold hover:bg-amber-100"
+          >
+            <RefreshCw size={13} /> Ajustar tiempos
+          </button>
+        )}
+
+        <div className="space-y-2 pt-1">
+          <button
+            onClick={onSave}
+            disabled={saving || !review.canSave}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 text-white rounded-xl text-sm font-black transition-colors shadow-sm"
+          >
+            <Save size={15} /> {saving ? "Guardando..." : "Guardar sesión"}
+          </button>
+          <button
+            onClick={onTryClass}
+            disabled={saving || !review.canSave}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-slate-900 text-white rounded-xl text-sm font-black transition-colors"
+          >
+            <BookOpen size={15} /> Probar en modo clase
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function Metric({ label, value }) {
+  return (
+    <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+      <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide">
+        {label}
+      </p>
+      <p className="text-lg font-black text-slate-800">{value}</p>
     </div>
   );
 }
