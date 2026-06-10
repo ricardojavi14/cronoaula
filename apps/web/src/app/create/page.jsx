@@ -126,19 +126,25 @@ function analyzeSession(meta = {}, moments = []) {
 
   const recommendations = [];
   if (flags.inicio && flags.desarrollo && flags.cierre) {
-    recommendations.push("Tu sesion tiene estructura completa.");
+    recommendations.push("Tu sesion tiene inicio, desarrollo y cierre.");
   }
   if (!flags.cierre) {
     recommendations.push("Agrega un cierre para consolidar aprendizajes.");
   }
   if (!flags.purpose) {
-    recommendations.push("No se detecto proposito de aprendizaje.");
+    recommendations.push(
+      "Agrega un proposito para que la sesion tenga una meta clara.",
+    );
   }
   if (!flags.evidence) {
-    recommendations.push("No se detecto evidencia o producto.");
+    recommendations.push(
+      "Agrega una evidencia o producto para saber que demostraran los estudiantes.",
+    );
   }
   if (!flags.dua) {
-    recommendations.push("No se detecto adaptacion DUA.");
+    recommendations.push(
+      "Agrega una adaptacion DUA si algun estudiante necesita apoyo diferenciado.",
+    );
   }
   if (flags.cierre && cierreDuration > 0 && cierreDuration < 5) {
     recommendations.push(
@@ -146,14 +152,14 @@ function analyzeSession(meta = {}, moments = []) {
     );
   }
   if (diff === 0 && totalDuration > 0 && used > 0) {
-    recommendations.push("El tiempo esta completo.");
+    recommendations.push("La distribucion del tiempo esta completa.");
   } else if (diff < 0) {
     recommendations.push(
-      `Faltan ${Math.abs(diff)} min; agrega actividades o redistribuye tiempos.`,
+      `Faltan ${Math.abs(diff)} min. Puedes sumar una actividad breve o redistribuir los tiempos.`,
     );
   } else if (diff > 0) {
     recommendations.push(
-      `Sobran ${diff} min; reduce actividades o aumenta la duracion total.`,
+      `Sobran ${diff} min. Ajusta la duracion de alguna actividad o revisa el tiempo total.`,
     );
   }
 
@@ -181,6 +187,19 @@ function tpl2m(tpl) {
       id: crypto.randomUUID(),
       order_index: si,
       status: "pending",
+    })),
+  }));
+}
+
+function normalizeImportedMoments(list = []) {
+  return list.map((moment) => ({
+    ...moment,
+    submoments: (moment.submoments || []).map((submoment) => ({
+      ...submoment,
+      name:
+        submoment.name === "Actividades del momento"
+          ? "Actividad principal"
+          : submoment.name,
     })),
   }));
 }
@@ -388,7 +407,7 @@ export default function CreateSessionPage() {
     setAnalyzing(true);
     try {
       const result = parseSessionText(iTxt);
-      setPrev(result);
+      setPrev({ ...result, moments: normalizeImportedMoments(result.moments) });
       setIStep("preview");
       toast.success("Texto importado. Revisa la vista previa.");
     } catch (err) {
@@ -474,7 +493,10 @@ export default function CreateSessionPage() {
             <h1 className="text-xl font-bold text-slate-800">
               {meta.title || "Nueva sesión"}
             </h1>
-            <p className="text-slate-500 text-xs">
+            <p className="text-slate-500 text-xs mt-0.5">
+              Importa, revisa y ajusta tu sesión antes de llevarla al modo clase.
+            </p>
+            <p className="text-slate-400 text-xs mt-1">
               {meta.area}
               {meta.grade ? ` · ${meta.grade}` : ""}
             </p>
@@ -774,8 +796,12 @@ export default function CreateSessionPage() {
                               style={{ backgroundColor: c }}
                             />
                             <input
-                              className="flex-1 text-sm font-semibold text-slate-700 bg-transparent outline-none border-b border-transparent focus:border-slate-200"
-                              value={sm.name}
+                              className="flex-1 text-sm font-semibold text-slate-800 bg-transparent outline-none border-b border-transparent focus:border-slate-300"
+                              value={
+                                sm.name === "Actividades del momento"
+                                  ? "Actividad principal"
+                                  : sm.name
+                              }
                               onChange={(e) => {
                                 const mo = [...prev.moments];
                                 mo[mi].submoments[si] = {
@@ -804,8 +830,8 @@ export default function CreateSessionPage() {
                           </div>
                           <textarea
                             rows={2}
-                            className="w-full resize-none rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-600 outline-none focus:ring-1 focus:ring-blue-400"
-                            placeholder="Contenido extraido para esta actividad..."
+                            className="w-full resize-none rounded-xl bg-slate-50/70 border border-slate-200 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                            placeholder="Describe o ajusta la actividad principal..."
                             value={sm.description || sm.teacher_note || ""}
                             onChange={(e) => {
                               const mo = [...prev.moments];
@@ -818,9 +844,9 @@ export default function CreateSessionPage() {
                             }}
                           />
                           {(sm.description || sm.teacher_note) && (
-                            <p className="text-[11px] text-slate-400">
-                              Vista compacta: se muestran 2 lineas; puedes
-                              editar o ampliar el campo.
+                            <p className="text-[11px] text-slate-500">
+                              Texto extraído del plan. Puedes editarlo antes de
+                              guardar.
                             </p>
                           )}
                         </div>
@@ -1318,7 +1344,7 @@ function SessionReviewPanel({
             disabled={saving || !review.canSave}
             className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-slate-900 text-white rounded-xl text-sm font-black transition-colors"
           >
-            <BookOpen size={15} /> Probar en modo clase
+            <BookOpen size={15} /> Ver en modo clase
           </button>
         </div>
       </div>
