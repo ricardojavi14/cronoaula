@@ -66,6 +66,14 @@ function F({ label, children }) {
   );
 }
 
+function calcMomentsTotal(list = []) {
+  return list.reduce((total, moment) => {
+    const subs = Array.isArray(moment.submoments) ? moment.submoments : [];
+    const subTotal = subs.reduce((sum, sm) => sum + (Number(sm.duration) || 0), 0);
+    return total + (subTotal || Number(moment.duration) || 0);
+  }, 0);
+}
+
 function tpl2m(tpl) {
   return tpl.map((m, i) => ({
     ...m,
@@ -144,12 +152,13 @@ export default function CreateSessionPage() {
     }
   }, []);
 
-  const total = moments.reduce(
-    (t, m) =>
-      t + m.submoments.reduce((s, sm) => s + (Number(sm.duration) || 0), 0),
-    0,
-  );
-  const diff = meta.total_duration - total;
+  const total = calcMomentsTotal(moments);
+  const previewTotal = prev ? calcMomentsTotal(prev.moments) : 0;
+  const activeDuration = tab === "import" && iStep === "preview" && prev
+    ? Number(prev.total_duration) || 0
+    : Number(meta.total_duration) || 0;
+  const activeTotal = tab === "import" && iStep === "preview" && prev ? previewTotal : total;
+  const timeDiff = activeTotal - activeDuration;
 
   const redis = () => {
     if (!total) return;
@@ -352,15 +361,22 @@ export default function CreateSessionPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {diff !== 0 && (
+          {activeDuration > 0 && timeDiff !== 0 && (
             <div
-              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${diff > 0 ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-red-50 text-red-700 border border-red-200"}`}
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${timeDiff > 0 ? "bg-red-50 text-red-700 border border-red-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}
             >
               <AlertCircle size={12} />
-              {diff > 0 ? `Sobran ${diff} min` : `Faltan ${Math.abs(diff)} min`}
-              <button onClick={redis} className="ml-1 underline font-bold">
-                Ajustar
-              </button>
+              {timeDiff > 0 ? `Sobran ${timeDiff} min` : `Faltan ${Math.abs(timeDiff)} min`}
+              {!(tab === "import" && iStep === "preview") && (
+                <button onClick={redis} className="ml-1 underline font-bold">
+                  Ajustar
+                </button>
+              )}
+            </div>
+          )}
+          {activeDuration > 0 && timeDiff === 0 && activeTotal > 0 && !(tab === "import" && iStep === "paste") && (
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <Check size={12} /> Tiempo completo
             </div>
           )}
           <button
@@ -399,10 +415,10 @@ export default function CreateSessionPage() {
               </div>
               <div>
                 <h2 className="font-bold text-slate-800">
-                  Importar planificación con IA
+                  Importar planificación
                 </h2>
                 <p className="text-slate-500 text-sm">
-                  La IA extrae momentos, tiempos y notas automáticamente
+                  Extrae momentos, tiempos y notas con un importador local
                 </p>
               </div>
             </div>
@@ -412,7 +428,7 @@ export default function CreateSessionPage() {
                 <li>
                   Pega el texto de tu planificación o sube un archivo .txt
                 </li>
-                <li>La IA analiza y extrae la estructura pedagógica</li>
+                <li>El importador analiza y extrae la estructura pedagógica</li>
                 <li>Tú revisas y editas antes de confirmar</li>
                 <li>¡Tu sesión queda lista para modo clase!</li>
               </ol>
@@ -565,10 +581,7 @@ export default function CreateSessionPage() {
             <div className="space-y-3">
               {prev.moments.map((m, mi) => {
                 const c = MC[mi % MC.length];
-                const t = m.submoments.reduce(
-                  (s, sm) => s + (sm.duration || 0),
-                  0,
-                );
+                const t = calcMomentsTotal([m]);
                 return (
                   <div
                     key={mi}
@@ -997,10 +1010,7 @@ function MomentsEditor({
         {moments.map((m, mi) => {
           const mc = m.color || MC[mi % MC.length];
           const isE = exp[mi];
-          const mt = m.submoments.reduce(
-            (s, sm) => s + (Number(sm.duration) || 0),
-            0,
-          );
+          const mt = calcMomentsTotal([m]);
           return (
             <div
               key={m.id}

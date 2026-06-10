@@ -53,8 +53,42 @@ function extractActivities(block) {
     .replace(/^NOMBRE\s*[:：-].*$/im, "")
     .replace(/^DURACION\s*[:：-].*$/im, "")
     .replace(/^HORARIO\s*[:：-].*$/im, "")
+    .replace(/^TIPO\s*[:：-].*$/im, "")
     .trim();
   return raw || "Actividad importada desde texto.";
+}
+
+function splitExplicitSubmoments(block) {
+  const lines = block.split("\n");
+  const starts = [];
+  lines.forEach((line, idx) => {
+    const normalized = line.trim().toUpperCase();
+    if (/^(SUBMOMENTO|ACTIVIDAD|PASO)\s*\d+/i.test(normalized)) {
+      starts.push(idx);
+    }
+  });
+
+  if (!starts.length) return [];
+
+  return starts
+    .map((start, i) => lines.slice(start, starts[i + 1] || lines.length).join("\n").trim())
+    .filter(Boolean)
+    .map((chunk, idx) => {
+      const first = chunk.split("\n").find((l) => l.trim())?.trim() || `Actividad ${idx + 1}`;
+      const nameFromHeader = first
+        .replace(/^(SUBMOMENTO|ACTIVIDAD|PASO)\s*\d*\s*[:.-]?\s*/i, "")
+        .trim();
+      const duration = minutesFrom(valueAfter(chunk, ["DURACION", "DURACIÓN"]), minutesFrom(first, 0));
+      return {
+        id: makeId("submoment"),
+        name: nameFromHeader || `Actividad ${idx + 1}`,
+        duration: duration || 5,
+        description: extractActivities(chunk),
+        teacher_note: "Submomento importado. Revisa tiempo y descripción.",
+        order_index: idx,
+        status: "pending",
+      };
+    });
 }
 
 export function parseSessionText(input) {
@@ -75,6 +109,7 @@ export function parseSessionText(input) {
     const isCierre = /cierre|metacog/i.test(name);
     const isInicio = /inicio/i.test(name);
     const type = isInicio ? "Inicio" : isCierre ? "Cierre" : "Desarrollo";
+    const explicitSubmoments = splitExplicitSubmoments(block);
     return {
       id: makeId("moment"),
       type,
@@ -86,15 +121,17 @@ export function parseSessionText(input) {
       bgOpacity: 0.35,
       bgBlur: 0,
       bgOverlay: "dark",
-      submoments: [{
-        id: makeId("submoment"),
-        name,
-        duration: duration || 10,
-        description: extractActivities(block),
-        teacher_note: "Revisa este bloque importado y ajusta si es necesario.",
-        order_index: 0,
-        status: "pending",
-      }],
+      submoments: explicitSubmoments.length
+        ? explicitSubmoments
+        : [{
+            id: makeId("submoment"),
+            name: "Actividades del momento",
+            duration: duration || 10,
+            description: extractActivities(block),
+            teacher_note: "Revisa este bloque importado y ajusta si es necesario.",
+            order_index: 0,
+            status: "pending",
+          }],
     };
   });
 
