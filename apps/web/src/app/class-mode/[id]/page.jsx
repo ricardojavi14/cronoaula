@@ -53,24 +53,60 @@ function formatMinutes(seconds = 0) {
   return `${mins} min`;
 }
 
-function cleanText(...parts) {
-  return parts
-    .flat()
-    .filter(Boolean)
-    .map((part) => String(part).trim())
-    .filter(Boolean)
-    .join("\n\n");
+function normalizeText(text = "") {
+  return String(text)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function displayActivityName(name = "") {
+  const normalized = normalizeText(name);
+  if (
+    normalized === "actividades del momento" ||
+    normalized === "actividad principal"
+  ) {
+    return "Actividad de aprendizaje";
+  }
+  return String(name || "Actividad de aprendizaje").trim();
+}
+
+function chooseMostComplete(a = "", b = "") {
+  const first = String(a || "").trim();
+  const second = String(b || "").trim();
+  if (!first) return second;
+  if (!second) return first;
+  const nf = normalizeText(first);
+  const ns = normalizeText(second);
+  if (nf === ns) return first.length >= second.length ? first : second;
+  if (nf.includes(ns)) return first;
+  if (ns.includes(nf)) return second;
+  return null;
+}
+
+function getActivityParts(moment, submoment) {
+  const subDescription = submoment?.description || submoment?.activities || "";
+  const momentDescription = moment?.description || moment?.activities || "";
+  const description =
+    chooseMostComplete(subDescription, momentDescription) ||
+    String(subDescription || momentDescription || "").trim();
+  const note =
+    chooseMostComplete(submoment?.teacher_note, moment?.teacher_note) ||
+    String(submoment?.teacher_note || moment?.teacher_note || "").trim();
+  const merged = chooseMostComplete(description, note);
+
+  if (merged) return { activity: merged, note: "" };
+
+  return {
+    activity: description || note || "",
+    note: note || "",
+  };
 }
 
 function getActivityText(moment, submoment) {
-  return cleanText(
-    submoment?.description,
-    submoment?.activities,
-    submoment?.teacher_note,
-    moment?.description,
-    moment?.activities,
-    moment?.teacher_note,
-  );
+  return getActivityParts(moment, submoment).activity;
 }
 
 function getMomentDuration(moment) {
@@ -174,7 +210,10 @@ export default function ClassModePage({ params }) {
       ? Math.min(100, (workedSeconds / totalPlannedSeconds) * 100)
       : 0;
   const totalActivities = countSubmoments(moments);
-  const activityText = getActivityText(currentMoment, currentSub);
+  const activityParts = getActivityParts(currentMoment, currentSub);
+  const activityText = activityParts.activity;
+  const teacherNote = activityParts.note;
+  const currentActivityName = displayActivityName(currentSub.name);
   const isLastActivity =
     currentMomentIdx === moments.length - 1 &&
     currentSubIdx === (currentMoment.submoments?.length || 1) - 1;
@@ -354,16 +393,21 @@ export default function ClassModePage({ params }) {
           </div>
 
           <div className="max-w-5xl space-y-7">
-            <p className="inline-flex px-5 py-2 rounded-full text-xl font-black bg-white/10 border border-white/15">
-              {currentMoment.name}
+            <p className="inline-flex px-5 py-2 rounded-full text-lg font-black bg-white/10 border border-white/15">
+              Modo proyector
             </p>
-            <h1 className="text-4xl md:text-6xl font-black leading-tight">
-              {currentSub.name || "Actividad de aprendizaje"}
+            <h1 className="text-5xl md:text-7xl font-black leading-tight">
+              {currentMoment.name}
             </h1>
             {activityText && (
-              <p className="text-2xl md:text-3xl leading-relaxed text-white/85 max-w-4xl mx-auto line-clamp-4">
-                {activityText}
-              </p>
+              <div className="space-y-3">
+                <p className="text-white/50 text-xl md:text-2xl font-black uppercase tracking-wide">
+                  Actividad de aprendizaje
+                </p>
+                <p className="text-2xl md:text-3xl leading-relaxed text-white/85 max-w-4xl mx-auto line-clamp-6">
+                  {activityText}
+                </p>
+              </div>
             )}
             <div
               className={`font-mono font-black leading-none tracking-tight ${
@@ -412,6 +456,7 @@ export default function ClassModePage({ params }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <ModeToggle active onClick={() => setProjectorMode(false)} icon={<BookOpen size={15} />} label="Vista docente" />
           <ModeToggle active={focusMode} onClick={() => setFocusMode((v) => !v)} icon={focusMode ? <EyeOff size={15} /> : <Eye size={15} />} label="Sin distracciones" />
           <ModeToggle onClick={() => setProjectorMode(true)} icon={<Maximize2 size={15} />} label="Modo proyector" />
           <button
@@ -425,10 +470,13 @@ export default function ClassModePage({ params }) {
 
       <main className="h-[calc(100vh-4rem)] overflow-y-auto">
         <div className={`grid gap-5 p-4 md:p-6 ${focusMode ? "max-w-5xl mx-auto" : "xl:grid-cols-[1fr_340px] max-w-7xl mx-auto"}`}>
-          <section className="space-y-5 min-w-0">
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 md:p-7 space-y-6">
+          <section className="space-y-4 min-w-0">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 md:p-6 space-y-4">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div className="space-y-2">
+                  <p className="text-xs font-black text-blue-600 uppercase tracking-wide">
+                    Vista docente
+                  </p>
                   <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-white text-xs font-black" style={{ backgroundColor: momentColor }}>
                     Momento {currentMomentIdx + 1} de {moments.length}
                   </span>
@@ -436,19 +484,48 @@ export default function ClassModePage({ params }) {
                     {currentMoment.name}
                   </h2>
                   <p className="text-sm md:text-base text-slate-500 font-medium">
-                    {currentSub.name || "Actividad de aprendizaje"}
+                    Actividad de aprendizaje
                   </p>
                 </div>
                 <StatusBadge alertState={alertState} />
               </div>
 
-              <div className="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-5 items-stretch">
-                <div className="rounded-3xl bg-slate-950 text-white p-6 md:p-8 flex flex-col items-center justify-center min-h-[280px]">
+              <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-stretch">
+                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 md:p-5 space-y-3 min-h-[220px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-black text-slate-900">
+                      {currentActivityName}
+                    </h3>
+                    {hasLongText(activityText) && (
+                      <button
+                        onClick={() => setActivityExpanded((v) => !v)}
+                        className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold text-slate-700 shrink-0"
+                      >
+                        {activityExpanded ? "Ver menos" : "Ver completo"}
+                      </button>
+                    )}
+                  </div>
+                  <p className={`text-[15px] md:text-base leading-relaxed text-slate-800 whitespace-pre-line ${activityExpanded ? "" : "line-clamp-5"}`}>
+                    {activityText || "No hay descripcion registrada para esta actividad. Puedes continuar con la guia de momentos."}
+                  </p>
+                  {teacherNote && (
+                    <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
+                      <p className="text-[11px] font-black uppercase tracking-wide text-amber-700 mb-1">
+                        Nota docente
+                      </p>
+                      <p className="text-sm leading-relaxed text-amber-900 whitespace-pre-line">
+                        {teacherNote}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl bg-slate-950 text-white p-5 md:p-6 flex flex-col items-center justify-center min-h-[220px]">
                   <p className="text-white/60 text-sm font-bold uppercase tracking-wide mb-2">
                     Tiempo del momento
                   </p>
                   <div
-                    className={`font-mono font-black leading-none tracking-tight text-[88px] md:text-[132px] ${
+                    className={`font-mono font-black leading-none tracking-tight text-[82px] md:text-[118px] ${
                       alertState === "critical"
                         ? "text-red-300"
                         : alertState === "soft"
@@ -464,49 +541,23 @@ export default function ClassModePage({ params }) {
                     Total restante: {formatMinutes(totalSessionLeft)}
                   </p>
                 </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
-                  <InfoCard label="Momento restante" value={formatMinutes(timeLeft)} icon={<Timer size={18} />} />
-                  <InfoCard label="Sesion restante" value={formatMinutes(totalSessionLeft)} icon={<BookOpen size={18} />} />
-                  <InfoCard label="Progreso momento" value={`${Math.round(currentProgress)}%`} icon={<CheckCircle2 size={18} />} />
-                  <InfoCard label="Progreso general" value={`${Math.round(generalProgress)}%`} icon={<Flag size={18} />} />
-                </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <InfoCard label="Momento restante" value={formatMinutes(timeLeft)} icon={<Timer size={18} />} compact />
+                <InfoCard label="Sesion restante" value={formatMinutes(totalSessionLeft)} icon={<BookOpen size={18} />} compact />
+                <InfoCard label="Progreso momento" value={`${Math.round(currentProgress)}%`} icon={<CheckCircle2 size={18} />} compact />
+                <InfoCard label="Progreso general" value={`${Math.round(generalProgress)}%`} icon={<Flag size={18} />} compact />
+              </div>
+
+              <div className="space-y-2">
                 <ProgressHeader label="Progreso del momento" value={currentProgress} />
                 <ProgressBar value={currentProgress} color={momentColor} />
                 <ProgressHeader label="Progreso general de la sesion" value={generalProgress} />
                 <ProgressBar value={generalProgress} color="#2563EB" />
               </div>
-            </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 md:p-6 space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-black text-blue-600 uppercase tracking-wide">
-                    Guia docente
-                  </p>
-                  <h3 className="text-lg font-black text-slate-900">
-                    Actividad de aprendizaje
-                  </h3>
-                </div>
-                {hasLongText(activityText) && (
-                  <button
-                    onClick={() => setActivityExpanded((v) => !v)}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700"
-                  >
-                    {activityExpanded ? "Ver menos" : "Ver completo"}
-                  </button>
-                )}
-              </div>
-              <p className={`text-base leading-relaxed text-slate-800 whitespace-pre-line ${activityExpanded ? "" : "line-clamp-6"}`}>
-                {activityText || "No hay descripcion registrada para esta actividad. Puedes continuar con la guia de momentos."}
-              </p>
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 md:p-5">
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-3 pt-1">
                 <ClassButton onClick={goPrevious} icon={<SkipBack size={20} />} label="Anterior" />
                 <ClassButton
                   onClick={() => setIsActive((active) => !active)}
@@ -532,11 +583,29 @@ export default function ClassModePage({ params }) {
                   {moments.map((moment, momentIdx) => (
                     <div
                       key={moment.id || momentIdx}
-                      className={`rounded-xl border p-3 ${momentIdx === currentMomentIdx ? "bg-blue-50 border-blue-200" : "bg-white border-slate-100"}`}
+                      className={`rounded-xl border p-3 ${
+                        momentIdx === currentMomentIdx
+                          ? "bg-blue-50 border-blue-200"
+                          : momentIdx < currentMomentIdx
+                            ? "bg-emerald-50 border-emerald-100"
+                            : momentIdx === currentMomentIdx + 1
+                              ? "bg-amber-50 border-amber-100"
+                              : "bg-white border-slate-100"
+                      }`}
                     >
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: moment.color || COLORS[momentIdx % COLORS.length] }} />
                         <p className="text-sm font-bold text-slate-800 flex-1">{moment.name}</p>
+                        {momentIdx < currentMomentIdx && (
+                          <span className="text-[10px] font-black text-emerald-700">
+                            Hecho
+                          </span>
+                        )}
+                        {momentIdx === currentMomentIdx + 1 && (
+                          <span className="text-[10px] font-black text-amber-700">
+                            Sigue
+                          </span>
+                        )}
                         <span className="text-xs font-mono text-slate-400">{getMomentDuration(moment)}m</span>
                       </div>
                       {momentIdx === currentMomentIdx && (
@@ -621,12 +690,12 @@ function ProgressBar({ value, color, dark = false }) {
   );
 }
 
-function InfoCard({ label, value, icon }) {
+function InfoCard({ label, value, icon, compact = false }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-center gap-2 text-slate-400 mb-2">{icon}</div>
+    <div className={`rounded-2xl border border-slate-200 bg-slate-50 ${compact ? "p-3" : "p-4"}`}>
+      <div className={`flex items-center gap-2 text-slate-400 ${compact ? "mb-1" : "mb-2"}`}>{icon}</div>
       <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{label}</p>
-      <p className="text-lg font-black text-slate-900">{value}</p>
+      <p className={`${compact ? "text-base" : "text-lg"} font-black text-slate-900`}>{value}</p>
     </div>
   );
 }
