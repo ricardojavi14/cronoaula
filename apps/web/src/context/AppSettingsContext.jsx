@@ -21,7 +21,7 @@ export const DEFAULT_SETTINGS = {
   decorativeBackgrounds: true,
 
   // Modo clase
-  timerSize: "grande", // grande | gigante | proyector
+  timerSize: "grande", // grande | gigante
   defaultClassView: "teacher", // teacher | class
   showCurrentMoment: true,
   showNextMoment: true,

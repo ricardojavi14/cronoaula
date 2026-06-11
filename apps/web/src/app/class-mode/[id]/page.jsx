@@ -137,7 +137,6 @@ function getClassTheme(settings) {
       text: "#FFFFFF",
       muted: "#FACC15",
       border: "#FACC15",
-      projectorBg: "#000000",
     };
   }
   if (settings.darkModeInClass || settings.theme === "oscuro") {
@@ -148,7 +147,6 @@ function getClassTheme(settings) {
       text: "#F8FAFC",
       muted: "#CBD5E1",
       border: "#334155",
-      projectorBg: "#020617",
     };
   }
   if (settings.theme === "calido") {
@@ -159,7 +157,6 @@ function getClassTheme(settings) {
       text: "#3D2B1F",
       muted: "#9A3412",
       border: "#FED7AA",
-      projectorBg: "#431407",
     };
   }
   const theme = THEMES[settings.theme] || THEMES.claro;
@@ -170,8 +167,17 @@ function getClassTheme(settings) {
     text: theme.text || "#0F172A",
     muted: theme.textMuted || "#64748B",
     border: theme.border || "#E2E8F0",
-    projectorBg: "#0F172A",
   };
+}
+
+function readableText(hex = "#2563EB") {
+  const clean = String(hex).replace("#", "");
+  if (clean.length !== 6) return "#FFFFFF";
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.62 ? "#111827" : "#FFFFFF";
 }
 
 function getFontSize(settings) {
@@ -188,6 +194,7 @@ export default function ClassModePage({ params }) {
   const { id } = params;
   const { settings } = useAppSettings();
   const primaryColor = settings.primaryColor || "#2563EB";
+  const onPrimaryColor = readableText(primaryColor);
   const visualTheme = getClassTheme(settings);
   const timerScale = getTimerScale(settings);
   const [session, setSession] = useState(null);
@@ -202,7 +209,7 @@ export default function ClassModePage({ params }) {
   const [viewMode, setViewMode] = useState(
     settings.defaultClassView === "class" ? "class" : "teacher",
   );
-  const [projectorMode, setProjectorMode] = useState(false);
+  const [fullscreenMode, setFullscreenMode] = useState(false);
   const [focusMode, setFocusMode] = useState(Boolean(settings.distractionFree));
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [showLateStart, setShowLateStart] = useState(false);
@@ -292,6 +299,7 @@ export default function ClassModePage({ params }) {
           : "normal";
   const shellStyle = {
     "--class-primary": primaryColor,
+    "--class-on-primary": onPrimaryColor,
     "--class-bg": visualTheme.bg,
     "--class-surface": visualTheme.surface,
     "--class-soft": visualTheme.soft,
@@ -329,6 +337,25 @@ export default function ClassModePage({ params }) {
   useEffect(() => {
     setFocusMode(Boolean(settings.distractionFree));
   }, [settings.distractionFree]);
+
+  useEffect(() => {
+    const onChange = () => setFullscreenMode(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo activar pantalla completa");
+    }
+  };
 
   const saveCurrentStatus = useCallback(
     (status) => {
@@ -455,11 +482,11 @@ export default function ClassModePage({ params }) {
     );
   }
 
-  const shellClass = projectorMode
+  const shellClass = fullscreenMode
     ? "fixed inset-0 z-[100] text-white overflow-hidden"
     : "fixed inset-0 z-[100] overflow-hidden";
 
-  if (projectorMode) {
+  if (false && fullscreenMode) {
     return (
       <div
         className={shellClass}
@@ -468,10 +495,10 @@ export default function ClassModePage({ params }) {
         <div className="h-full flex flex-col items-center justify-center px-8 py-10 text-center">
           <div className="absolute top-5 left-5 right-5 flex items-center justify-between">
             <button
-              onClick={() => setProjectorMode(false)}
+              onClick={toggleFullscreen}
               className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold flex items-center gap-2"
             >
-              <Minimize2 size={16} /> Salir de proyector
+              <Minimize2 size={16} /> Salir de pantalla completa
             </button>
             <div className="text-right">
               <p className="text-white/60 text-sm">{session.area || "Area"} · {session.grade || "Grado"}</p>
@@ -481,7 +508,7 @@ export default function ClassModePage({ params }) {
 
           <div className="max-w-5xl space-y-7">
             <p className="inline-flex px-5 py-2 rounded-full text-lg font-black bg-white/10 border border-white/15">
-              Modo proyector
+              Pantalla completa
             </p>
             <h1 className="text-5xl md:text-7xl font-black leading-tight">
               {currentMoment.name}
@@ -550,9 +577,9 @@ export default function ClassModePage({ params }) {
         </div>
         <div className="flex items-center gap-2">
           <ModeToggle active={viewMode === "teacher"} onClick={() => setViewMode("teacher")} icon={<BookOpen size={15} />} label="Vista docente" />
-          <ModeToggle active={viewMode === "class"} onClick={() => setViewMode("class")} icon={<Eye size={15} />} label="Vista de clase" />
+          <ModeToggle active={viewMode === "class"} onClick={() => setViewMode("class")} icon={<Eye size={15} />} label="Modo clase" />
           <ModeToggle active={focusMode} onClick={() => setFocusMode((v) => !v)} icon={focusMode ? <EyeOff size={15} /> : <Eye size={15} />} label="Sin distracciones" />
-          <ModeToggle onClick={() => setProjectorMode(true)} icon={<Maximize2 size={15} />} label="Modo proyector" />
+          <ModeToggle active={fullscreenMode} onClick={toggleFullscreen} icon={fullscreenMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />} label="Pantalla completa" />
           <button
             onClick={() => setShowLateStart(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold hover:bg-amber-100"
@@ -701,7 +728,14 @@ function TeacherView({
   return (
     <div className={`grid gap-4 p-4 md:p-5 ${focusMode ? "max-w-5xl mx-auto" : "xl:grid-cols-[1fr_320px] max-w-7xl mx-auto"}`}>
       <section className="min-w-0">
-        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-4 md:p-5 space-y-4">
+        <div
+          className="border rounded-3xl shadow-sm p-4 md:p-5 space-y-4"
+          style={{
+            backgroundColor: "var(--class-surface)",
+            borderColor: "var(--class-border)",
+            color: "var(--class-text)",
+          }}
+        >
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
             <div className="space-y-2">
               <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--class-primary)" }}>
@@ -710,10 +744,10 @@ function TeacherView({
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-white text-xs font-black" style={{ backgroundColor: momentColor }}>
                 Momento {currentMomentIdx + 1} de {moments.length}
               </span>
-              <h2 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight">
+              <h2 className="text-3xl md:text-4xl font-black leading-tight" style={{ color: "var(--class-text)" }}>
                 {currentMoment.name}
               </h2>
-              <p className="text-sm text-slate-500 font-semibold">
+              <p className="text-sm font-semibold" style={{ color: "var(--class-muted)" }}>
                 Actividad de aprendizaje
               </p>
             </div>
@@ -820,16 +854,23 @@ function ClassView({
       }}
     >
       <div className={`p-4 md:p-6 ${focusMode ? "max-w-5xl" : "max-w-6xl"} mx-auto`}>
-        <section className="rounded-[28px] bg-white/90 border border-white shadow-xl p-5 md:p-8 space-y-6">
+        <section
+          className="rounded-[28px] border shadow-xl p-5 md:p-8 space-y-6"
+          style={{
+            backgroundColor: "var(--class-surface)",
+            borderColor: "var(--class-border)",
+            color: "var(--class-text)",
+          }}
+        >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--class-primary)" }}>
-                Vista de clase
+                Modo clase
               </p>
-              <h2 className="text-4xl md:text-6xl font-black text-slate-900 leading-tight mt-2">
+              <h2 className="text-4xl md:text-6xl font-black leading-tight mt-2" style={{ color: "var(--class-text)" }}>
                 {currentMoment.name}
               </h2>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm mt-1" style={{ color: "var(--class-muted)" }}>
                 {session.area || "Area"} · {session.grade || "Grado"} · Momento {currentMomentIdx + 1} de {moments.length}
               </p>
             </div>
@@ -837,20 +878,31 @@ function ClassView({
           </div>
 
           <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-stretch">
-            <div className="rounded-3xl border border-blue-100 bg-blue-50/70 p-5 md:p-7 space-y-4">
+            <div
+              className="rounded-3xl border p-5 md:p-7 space-y-4"
+              style={{
+                backgroundColor: "var(--class-soft)",
+                borderColor: "var(--class-border)",
+              }}
+            >
               <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--class-primary)" }}>
                 Actividad de aprendizaje
               </p>
-              <h3 className="text-xl md:text-2xl font-black text-slate-900">
+              <h3 className="text-xl md:text-2xl font-black" style={{ color: "var(--class-text)" }}>
                 {currentActivityName}
               </h3>
-              <p className={`text-lg md:text-xl leading-relaxed text-slate-800 whitespace-pre-line ${activityExpanded ? "" : "line-clamp-5"}`}>
+              <p className={`text-lg md:text-xl leading-relaxed whitespace-pre-line ${activityExpanded ? "" : "line-clamp-5"}`} style={{ color: "var(--class-text)" }}>
                 {activityText || "Actividad sin descripcion registrada."}
               </p>
               {hasLongText(activityText) && (
                 <button
                   onClick={() => setActivityExpanded((v) => !v)}
-                  className="px-4 py-2 rounded-xl bg-white border border-blue-100 text-blue-700 text-sm font-black hover:bg-blue-50"
+                  className="px-4 py-2 rounded-xl border text-sm font-black hover:brightness-95"
+                  style={{
+                    backgroundColor: "var(--class-surface)",
+                    borderColor: "var(--class-border)",
+                    color: "var(--class-primary)",
+                  }}
                 >
                   {activityExpanded ? "Ver menos" : "Ver completo"}
                 </button>
@@ -868,12 +920,12 @@ function ClassView({
 
           <div className="space-y-2">
             <ProgressBar value={currentProgress} color={momentColor} />
-            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+            <div className="flex items-center justify-between text-xs font-bold" style={{ color: "var(--class-muted)" }}>
               <span>Progreso del momento</span>
               <span>{Math.round(currentProgress)}%</span>
             </div>
             <ProgressBar value={generalProgress} color={primaryColor} />
-            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+            <div className="flex items-center justify-between text-xs font-bold" style={{ color: "var(--class-muted)" }}>
               <span>Progreso de la sesion</span>
               <span>{Math.round(generalProgress)}%</span>
             </div>
@@ -1105,7 +1157,7 @@ function InfoCard({ label, value, icon, compact = false }) {
 
 function ClassButton({ onClick, icon, label, primary, danger, dark, className = "" }) {
   const cls = primary
-    ? "text-white"
+    ? ""
     : danger
       ? "bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
       : dark
@@ -1120,6 +1172,7 @@ function ClassButton({ onClick, icon, label, primary, danger, dark, className = 
           ? {
               backgroundColor: "var(--class-primary)",
               borderColor: "var(--class-primary)",
+              color: "var(--class-on-primary)",
             }
           : undefined
       }
@@ -1136,7 +1189,7 @@ function ModeToggle({ active, onClick, icon, label }) {
       onClick={onClick}
       className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold ${
         active
-          ? "text-white"
+          ? ""
           : "bg-white hover:bg-slate-50 text-slate-600 border-slate-200"
       }`}
       style={
@@ -1144,6 +1197,7 @@ function ModeToggle({ active, onClick, icon, label }) {
           ? {
               backgroundColor: "var(--class-primary)",
               borderColor: "var(--class-primary)",
+              color: "var(--class-on-primary)",
             }
           : undefined
       }
@@ -1205,12 +1259,13 @@ function LateStartModal({
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setLateMode("delay")}
-            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "delay" ? "text-white" : "border-slate-200 text-slate-600"}`}
+            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "delay" ? "" : "border-slate-200 text-slate-600"}`}
             style={
               lateMode === "delay"
                 ? {
                     backgroundColor: "var(--class-primary)",
                     borderColor: "var(--class-primary)",
+                    color: "var(--class-on-primary)",
                   }
                 : undefined
             }
@@ -1219,12 +1274,13 @@ function LateStartModal({
           </button>
           <button
             onClick={() => setLateMode("remaining")}
-            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "remaining" ? "text-white" : "border-slate-200 text-slate-600"}`}
+            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "remaining" ? "" : "border-slate-200 text-slate-600"}`}
             style={
               lateMode === "remaining"
                 ? {
                     backgroundColor: "var(--class-primary)",
                     borderColor: "var(--class-primary)",
+                    color: "var(--class-on-primary)",
                   }
                 : undefined
             }
@@ -1243,8 +1299,11 @@ function LateStartModal({
           </button>
           <button
             onClick={onApply}
-            className="flex-1 py-3 rounded-xl text-white font-black hover:brightness-95"
-            style={{ backgroundColor: "var(--class-primary)" }}
+            className="flex-1 py-3 rounded-xl font-black hover:brightness-95"
+            style={{
+              backgroundColor: "var(--class-primary)",
+              color: "var(--class-on-primary)",
+            }}
           >
             Aplicar ajuste
           </button>
@@ -1295,8 +1354,11 @@ function SummaryModal({ session, plannedSeconds, workedSeconds, completedCount, 
           </button>
           <a
             href={`/create?id=${session.id}`}
-            className="py-3 rounded-xl text-white font-black text-center hover:brightness-95"
-            style={{ backgroundColor: "var(--class-primary)" }}
+            className="py-3 rounded-xl font-black text-center hover:brightness-95"
+            style={{
+              backgroundColor: "var(--class-primary)",
+              color: "var(--class-on-primary)",
+            }}
           >
             Editar sesion
           </a>

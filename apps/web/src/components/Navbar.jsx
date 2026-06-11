@@ -92,7 +92,7 @@ export function Navbar({ theme }) {
 
           {teacher ? (
             <a
-              href="/onboarding"
+              href="/settings"
               className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-black/5 transition-colors text-sm font-medium"
             >
               <div
@@ -110,7 +110,7 @@ export function Navbar({ theme }) {
             </a>
           ) : (
             <a
-              href="/onboarding"
+              href="/settings"
               className="px-3 py-1.5 text-white rounded-lg text-sm font-semibold transition-colors hover:opacity-90"
               style={{ backgroundColor: "var(--ca-text, #1e293b)" }}
             >

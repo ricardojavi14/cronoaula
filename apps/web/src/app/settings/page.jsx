@@ -47,7 +47,7 @@ const DENSITY_OPTIONS = [
 
 const VIEW_OPTIONS = [
   { value: "teacher", label: "Vista docente" },
-  { value: "class", label: "Vista de clase" },
+  { value: "class", label: "Modo clase" },
 ];
 
 const COLOR_OPTIONS = [
@@ -72,6 +72,16 @@ function buildTeacherState(settings) {
     classroomContext:
       settings.classroomContext || teacher.classroomContext || "",
   };
+}
+
+function readableText(hex = "#2563EB") {
+  const clean = String(hex).replace("#", "");
+  if (clean.length !== 6) return "#FFFFFF";
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.62 ? "#111827" : "#FFFFFF";
 }
 
 function Field({ label, children, hint }) {
@@ -146,7 +156,15 @@ function Card({ icon, title, subtitle, children }) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
       <div className="mb-5 flex items-start gap-3">
-        <div className="rounded-2xl bg-blue-50 p-3 text-blue-700">{icon}</div>
+        <div
+          className="rounded-2xl p-3"
+          style={{
+            backgroundColor: "var(--settings-accent-soft)",
+            color: "var(--settings-primary)",
+          }}
+        >
+          {icon}
+        </div>
         <div>
           <h2 className="text-lg font-black text-slate-950">{title}</h2>
           {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
@@ -171,7 +189,7 @@ function Segmented({ value, onChange, options }) {
               value === option.value ? "var(--settings-primary)" : "#FFFFFF",
             borderColor:
               value === option.value ? "var(--settings-primary)" : "#E2E8F0",
-            color: value === option.value ? "#FFFFFF" : "#334155",
+            color: value === option.value ? "var(--settings-on-primary)" : "#334155",
           }}
         >
           {option.label}
@@ -219,15 +237,18 @@ export default function SettingsPage() {
         defaultDuration: Number(teacher.defaultDuration) || 90,
         classroomContext: teacher.classroomContext,
       };
-      saveTeacher(teacherPayload);
-      setSettings({
+      const nextSettings = {
+        ...settings,
         teacherName: teacher.name,
         institution: teacher.institution,
         defaultGrade: teacher.defaultGrade,
         defaultArea: teacher.defaultArea,
         defaultDuration: Number(teacher.defaultDuration) || 90,
         classroomContext: teacher.classroomContext,
-      });
+      };
+      localStorage.setItem("cronoaula_settings", JSON.stringify(nextSettings));
+      saveTeacher(teacherPayload);
+      setSettings(nextSettings);
       toast.success("Configuración guardada");
     } catch (error) {
       console.error(error);
@@ -269,7 +290,11 @@ export default function SettingsPage() {
   return (
     <div
       className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-6 md:px-8"
-      style={{ "--settings-primary": settings.primaryColor || "#2563EB" }}
+      style={{
+        "--settings-primary": settings.primaryColor || "#2563EB",
+        "--settings-on-primary": readableText(settings.primaryColor),
+        "--settings-accent-soft": `${settings.primaryColor || "#2563EB"}18`,
+      }}
     >
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
@@ -282,7 +307,7 @@ export default function SettingsPage() {
               <ArrowLeft size={20} />
             </a>
             <div>
-              <p className="text-xs font-black uppercase tracking-wide text-blue-700">
+              <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--settings-primary)" }}>
                 Configuración
               </p>
               <h1 className="text-2xl font-black text-slate-950 md:text-3xl">
@@ -305,8 +330,11 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-sm transition hover:brightness-95"
-              style={{ backgroundColor: "var(--settings-primary)" }}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition hover:brightness-95"
+              style={{
+                backgroundColor: "var(--settings-primary)",
+                color: "var(--settings-on-primary)",
+              }}
             >
               <Save size={16} /> Guardar
             </button>
@@ -316,7 +344,7 @@ export default function SettingsPage() {
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <Card
             icon={<User size={22} />}
-            title="Datos del docente"
+            title="Perfil docente"
             subtitle="Estos datos ayudan a preparar sesiones más consistentes."
           >
             <div className="grid gap-4 md:grid-cols-2">
@@ -380,7 +408,7 @@ export default function SettingsPage() {
 
           <Card
             icon={<Palette size={22} />}
-            title="Configuración visual"
+            title="Apariencia"
             subtitle="Ajusta cómo se ve CronoAula durante la planificación y la clase."
           >
             <div className="space-y-5">
@@ -435,25 +463,13 @@ export default function SettingsPage() {
                 />
               </Field>
 
-              <Toggle
-                checked={Boolean(settings.animations)}
-                onChange={(value) => updateSetting("animations", value)}
-                label="Animaciones suaves"
-                hint="Mantiene transiciones discretas en botones y progreso."
-              />
-              <Toggle
-                checked={Boolean(settings.highContrastMode)}
-                onChange={(value) => updateSetting("highContrastMode", value)}
-                label="Modo alto contraste"
-                hint="Refuerza contraste en pantallas de clase y proyector."
-              />
             </div>
           </Card>
 
           <Card
             icon={<Monitor size={22} />}
             title="Modo clase"
-            subtitle="Preferencias para usar CronoAula en laptop, pantalla o proyector."
+            subtitle="Preferencias para usar CronoAula en laptop o pantalla."
           >
             <div className="grid gap-5 md:grid-cols-2">
               <Field label="Vista por defecto">
@@ -486,6 +502,34 @@ export default function SettingsPage() {
           </Card>
 
           <Card
+            icon={<Shield size={22} />}
+            title="Preferencias"
+            subtitle="Ajustes generales de comodidad, contraste y restauración."
+          >
+            <div className="space-y-4">
+              <Toggle
+                checked={Boolean(settings.animations)}
+                onChange={(value) => updateSetting("animations", value)}
+                label="Animaciones suaves"
+                hint="Mantiene transiciones discretas en botones y progreso."
+              />
+              <Toggle
+                checked={Boolean(settings.highContrastMode)}
+                onChange={(value) => updateSetting("highContrastMode", value)}
+                label="Alto contraste reforzado"
+                hint="Aumenta la legibilidad en Modo clase y pantalla completa."
+              />
+              <button
+                type="button"
+                onClick={handleReset}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                <RotateCcw size={16} /> Restaurar valores
+              </button>
+            </div>
+          </Card>
+
+          <Card
             icon={<Sparkles size={22} />}
             title="Vista previa"
             subtitle="Así se sentirá la personalización en Modo clase."
@@ -497,7 +541,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-wide opacity-70">
-                    Vista de clase
+                    Modo clase
                   </p>
                   <h3
                     className="mt-1 font-black"
@@ -525,9 +569,10 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div
-                className="mt-5 rounded-2xl px-4 py-4 text-center font-mono font-black text-white"
+                className="mt-5 rounded-2xl px-4 py-4 text-center font-mono font-black"
                 style={{
                   backgroundColor: settings.primaryColor || "#2563EB",
+                  color: readableText(settings.primaryColor),
                   fontSize:
                     settings.timerSize === "gigante" ? "54px" : "42px",
                 }}
