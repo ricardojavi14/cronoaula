@@ -11,8 +11,8 @@ import React, {
 // ─── Default settings ────────────────────────────────────────────────────────
 export const DEFAULT_SETTINGS = {
   // Apariencia
-  theme: "claro", // claro | oscuro | contraste | calido | colorido | minimalista
-  primaryColor: "#2563EB", // hex
+  theme: "oscuro", // claro | oscuro | contraste | calido | colorido | minimalista
+  primaryColor: "#38BDF8", // hex
   secondaryColor: "#059669",
   fontSize: "normal", // pequeño | normal | grande | gigante
   density: "normal", // compacta | normal | amplia
@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS = {
 
   // Modo clase
   timerSize: "grande", // grande | gigante
-  defaultClassView: "teacher", // teacher | class
+  defaultClassView: "class", // teacher | class
   showCurrentMoment: true,
   showNextMoment: true,
   showProgressBar: true,

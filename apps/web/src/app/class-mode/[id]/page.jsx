@@ -17,23 +17,13 @@ import {
   RotateCcw,
   SkipBack,
   SkipForward,
-  Timer,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAppSettings } from "@/context/AppSettingsContext";
 import { getSession, saveSession, updateSubmomentStatus } from "@/utils/localStore";
-import { THEMES, useAppSettings } from "@/context/AppSettingsContext";
 
-const COLORS = [
-  "#2563EB",
-  "#059669",
-  "#7C3AED",
-  "#D97706",
-  "#DC2626",
-  "#0891B2",
-  "#9333EA",
-  "#CA8A04",
-];
+const COLORS = ["#22C55E", "#38BDF8", "#A78BFA", "#F59E0B", "#F43F5E"];
 
 function toSeconds(minutes = 0) {
   return Math.max(0, Math.round((Number(minutes) || 0) * 60));
@@ -65,10 +55,7 @@ function normalizeText(text = "") {
 
 function displayActivityName(name = "") {
   const normalized = normalizeText(name);
-  if (
-    normalized === "actividades del momento" ||
-    normalized === "actividad principal"
-  ) {
+  if (normalized === "actividades del momento" || normalized === "actividad principal") {
     return "Actividad de aprendizaje";
   }
   return String(name || "Actividad de aprendizaje").trim();
@@ -99,11 +86,7 @@ function getActivityParts(moment, submoment) {
   const merged = chooseMostComplete(description, note);
 
   if (merged) return { activity: merged, note: "" };
-
-  return {
-    activity: description || note || "",
-    note: note || "",
-  };
+  return { activity: description || note || "", note: note || "" };
 }
 
 function getActivityText(moment, submoment) {
@@ -125,49 +108,7 @@ function countSubmoments(moments = []) {
 }
 
 function hasLongText(text = "") {
-  return String(text).length > 320 || String(text).split("\n").length > 5;
-}
-
-function getClassTheme(settings) {
-  if (settings.highContrastMode || settings.theme === "contraste") {
-    return {
-      bg: "#000000",
-      surface: "#111111",
-      soft: "#1F1F1F",
-      text: "#FFFFFF",
-      muted: "#FACC15",
-      border: "#FACC15",
-    };
-  }
-  if (settings.darkModeInClass || settings.theme === "oscuro") {
-    return {
-      bg: "#0F172A",
-      surface: "#111827",
-      soft: "#1E293B",
-      text: "#F8FAFC",
-      muted: "#CBD5E1",
-      border: "#334155",
-    };
-  }
-  if (settings.theme === "calido") {
-    return {
-      bg: "#FFF7ED",
-      surface: "#FFFFFF",
-      soft: "#FFEDD5",
-      text: "#3D2B1F",
-      muted: "#9A3412",
-      border: "#FED7AA",
-    };
-  }
-  const theme = THEMES[settings.theme] || THEMES.claro;
-  return {
-    bg: theme.bg || "#F1F5F9",
-    surface: theme.surface || "#FFFFFF",
-    soft: "#EFF6FF",
-    text: theme.text || "#0F172A",
-    muted: theme.textMuted || "#64748B",
-    border: theme.border || "#E2E8F0",
-  };
+  return String(text).length > 300 || String(text).split("\n").length > 5;
 }
 
 function readableText(hex = "#2563EB") {
@@ -177,7 +118,7 @@ function readableText(hex = "#2563EB") {
   const g = parseInt(clean.slice(2, 4), 16);
   const b = parseInt(clean.slice(4, 6), 16);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.62 ? "#111827" : "#FFFFFF";
+  return luminance > 0.62 ? "#0F172A" : "#FFFFFF";
 }
 
 function getFontSize(settings) {
@@ -186,17 +127,28 @@ function getFontSize(settings) {
   return "15px";
 }
 
-function getTimerScale(settings) {
-  return settings.timerSize === "gigante" ? "gigante" : "grande";
+function getTimerClass(timerSize, large = false) {
+  if (timerSize === "gigante") {
+    return large ? "text-[96px] sm:text-[150px] lg:text-[190px]" : "text-[82px] sm:text-[120px]";
+  }
+  return large ? "text-[82px] sm:text-[126px] lg:text-[160px]" : "text-[72px] sm:text-[104px]";
+}
+
+function getUrgency(timeLeft, durationSeconds) {
+  if (timeLeft <= 60 || timeLeft === 0) {
+    return { key: "critical", color: "#EF4444", label: timeLeft === 0 ? "Momento finalizado" : "Tiempo crítico" };
+  }
+  if (timeLeft <= 300 || timeLeft <= durationSeconds * 0.3) {
+    return { key: "medium", color: "#F59E0B", label: "Tiempo medio" };
+  }
+  return { key: "comfort", color: "#22C55E", label: "Tiempo cómodo" };
 }
 
 export default function ClassModePage({ params }) {
   const { id } = params;
   const { settings } = useAppSettings();
-  const primaryColor = settings.primaryColor || "#2563EB";
-  const onPrimaryColor = readableText(primaryColor);
-  const visualTheme = getClassTheme(settings);
-  const timerScale = getTimerScale(settings);
+  const accent = settings.primaryColor || "#38BDF8";
+  const onAccent = readableText(accent);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
@@ -206,11 +158,9 @@ export default function ClassModePage({ params }) {
   const [currentSubIdx, setCurrentSubIdx] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
-  const [viewMode, setViewMode] = useState(
-    settings.defaultClassView === "class" ? "class" : "teacher",
-  );
-  const [fullscreenMode, setFullscreenMode] = useState(false);
+  const [viewMode, setViewMode] = useState(settings.defaultClassView === "class" ? "class" : "teacher");
   const [focusMode, setFocusMode] = useState(Boolean(settings.distractionFree));
+  const [fullscreenMode, setFullscreenMode] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [showLateStart, setShowLateStart] = useState(false);
   const [lateMode, setLateMode] = useState("delay");
@@ -222,7 +172,7 @@ export default function ClassModePage({ params }) {
     try {
       const data = getSession(id);
       if (!data) {
-        toast.error("No encontre la sesion en este dispositivo");
+        toast.error("No encontré la sesión en este dispositivo");
         return;
       }
       const normalized = {
@@ -259,27 +209,14 @@ export default function ClassModePage({ params }) {
   const currentMoment = moments[currentMomentIdx] || {};
   const currentSub = currentMoment.submoments?.[currentSubIdx] || {};
   const nextMoment = moments[currentMomentIdx + 1] || null;
-  const nextSub =
-    currentMoment.submoments?.[currentSubIdx + 1] ||
-    nextMoment?.submoments?.[0] ||
-    null;
-  const nextMomentLabel =
-    currentMoment.submoments?.[currentSubIdx + 1]
-      ? currentMoment.name
-      : nextMoment?.name;
-  const momentColor = currentMoment.color || COLORS[currentMomentIdx % COLORS.length];
+  const nextSub = currentMoment.submoments?.[currentSubIdx + 1] || nextMoment?.submoments?.[0] || null;
+  const nextMomentLabel = currentMoment.submoments?.[currentSubIdx + 1] ? currentMoment.name : nextMoment?.name;
   const totalPlannedSeconds = getTotalSeconds(moments);
   const totalSessionLeft = Math.max(0, totalPlannedSeconds - workedSeconds);
   const currentDurationSeconds = toSeconds(currentSub.duration || 0);
   const currentElapsed = Math.max(0, currentDurationSeconds - timeLeft);
-  const currentProgress =
-    currentDurationSeconds > 0
-      ? Math.min(100, (currentElapsed / currentDurationSeconds) * 100)
-      : 0;
-  const generalProgress =
-    totalPlannedSeconds > 0
-      ? Math.min(100, (workedSeconds / totalPlannedSeconds) * 100)
-      : 0;
+  const currentProgress = currentDurationSeconds > 0 ? Math.min(100, (currentElapsed / currentDurationSeconds) * 100) : 0;
+  const generalProgress = totalPlannedSeconds > 0 ? Math.min(100, (workedSeconds / totalPlannedSeconds) * 100) : 0;
   const totalActivities = countSubmoments(moments);
   const activityParts = getActivityParts(currentMoment, currentSub);
   const activityText = activityParts.activity;
@@ -288,28 +225,7 @@ export default function ClassModePage({ params }) {
   const isLastActivity =
     currentMomentIdx === moments.length - 1 &&
     currentSubIdx === (currentMoment.submoments?.length || 1) - 1;
-
-  const alertState =
-    timeLeft === 0
-      ? "done"
-      : timeLeft <= 60
-        ? "critical"
-        : timeLeft <= 300
-          ? "soft"
-          : "normal";
-  const shellStyle = {
-    "--class-primary": primaryColor,
-    "--class-on-primary": onPrimaryColor,
-    "--class-bg": visualTheme.bg,
-    "--class-surface": visualTheme.surface,
-    "--class-soft": visualTheme.soft,
-    "--class-text": visualTheme.text,
-    "--class-muted": visualTheme.muted,
-    "--class-border": visualTheme.border,
-    backgroundColor: visualTheme.bg,
-    color: visualTheme.text,
-    fontSize: getFontSize(settings),
-  };
+  const urgency = getUrgency(timeLeft, currentDurationSeconds);
 
   useEffect(() => {
     if (!isActive || showSummary) return;
@@ -326,9 +242,7 @@ export default function ClassModePage({ params }) {
     return () => clearInterval(timerRef.current);
   }, [isActive, showSummary, totalPlannedSeconds]);
 
-  useEffect(() => {
-    setActivityExpanded(false);
-  }, [currentMomentIdx, currentSubIdx]);
+  useEffect(() => setActivityExpanded(false), [currentMomentIdx, currentSubIdx]);
 
   useEffect(() => {
     setViewMode(settings.defaultClassView === "class" ? "class" : "teacher");
@@ -343,19 +257,6 @@ export default function ClassModePage({ params }) {
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
-
-  const toggleFullscreen = async () => {
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        await document.documentElement.requestFullscreen();
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("No se pudo activar pantalla completa");
-    }
-  };
 
   const saveCurrentStatus = useCallback(
     (status) => {
@@ -385,15 +286,7 @@ export default function ClassModePage({ params }) {
     }
     setIsActive(false);
     setShowSummary(true);
-  }, [
-    currentMoment.submoments,
-    currentMomentIdx,
-    currentSubIdx,
-    moments,
-    saveCurrentStatus,
-    session,
-    totalActivities,
-  ]);
+  }, [currentMoment.submoments, currentMomentIdx, currentSubIdx, moments, saveCurrentStatus, session, totalActivities]);
 
   const goPrevious = () => {
     if (!session) return;
@@ -424,19 +317,23 @@ export default function ClassModePage({ params }) {
     setTimeLeft(toSeconds(moments?.[0]?.submoments?.[0]?.duration || 0));
   };
 
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo activar pantalla completa");
+    }
+  };
+
   const applyLateAdjustment = () => {
     if (!session) return;
-    const remaining = moments.slice(currentMomentIdx).map((moment, idx) => ({
-      moment,
-      absoluteIdx: currentMomentIdx + idx,
-    }));
+    const remaining = moments.slice(currentMomentIdx).map((moment, idx) => ({ moment, absoluteIdx: currentMomentIdx + idx }));
     const remainingSeconds = remaining.reduce((sum, item, idx) => {
       const subs = item.moment.submoments || [];
       const startSub = idx === 0 ? currentSubIdx : 0;
-      return (
-        sum +
-        subs.slice(startSub).reduce((subSum, sub) => subSum + toSeconds(sub.duration || 0), 0)
-      );
+      return sum + subs.slice(startSub).reduce((subSum, sub) => subSum + toSeconds(sub.duration || 0), 0);
     }, 0);
     const targetSeconds =
       lateMode === "remaining"
@@ -445,8 +342,8 @@ export default function ClassModePage({ params }) {
     const factor = remainingSeconds > 0 ? targetSeconds / remainingSeconds : 1;
     const message =
       lateMode === "remaining"
-        ? `Redistribuir los momentos restantes en ${remainingMinutesInput} minutos?`
-        : `Reducir ${lateMinutes} minutos de los momentos restantes?`;
+        ? `¿Redistribuir los momentos restantes en ${remainingMinutesInput} minutos?`
+        : `¿Reducir ${lateMinutes} minutos de los momentos restantes?`;
 
     if (!confirm(message)) return;
 
@@ -456,10 +353,7 @@ export default function ClassModePage({ params }) {
         ...moment,
         submoments: (moment.submoments || []).map((sub, subIdx) => {
           if (momentIdx === currentMomentIdx && subIdx < currentSubIdx) return sub;
-          return {
-            ...sub,
-            duration: Math.max(1, Math.round((Number(sub.duration) || 1) * factor)),
-          };
+          return { ...sub, duration: Math.max(1, Math.round((Number(sub.duration) || 1) * factor)) };
         }),
       };
     });
@@ -473,186 +367,98 @@ export default function ClassModePage({ params }) {
 
   if (loading || !session) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-50">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950 text-white">
         <div className="text-center space-y-3">
-          <div className="w-10 h-10 rounded-full border-2 border-blue-600 border-t-transparent mx-auto animate-spin" />
-          <p className="text-sm text-slate-500">Cargando modo clase...</p>
+          <div className="w-10 h-10 rounded-full border-2 border-cyan-300 border-t-transparent mx-auto animate-spin" />
+          <p className="text-sm text-slate-400">Cargando modo clase...</p>
         </div>
       </div>
     );
   }
 
-  const shellClass = fullscreenMode
-    ? "fixed inset-0 z-[100] text-white overflow-hidden"
-    : "fixed inset-0 z-[100] overflow-hidden";
-
-  if (false && fullscreenMode) {
-    return (
-      <div
-        className={shellClass}
-        style={{ ...shellStyle, backgroundColor: visualTheme.projectorBg }}
-      >
-        <div className="h-full flex flex-col items-center justify-center px-8 py-10 text-center">
-          <div className="absolute top-5 left-5 right-5 flex items-center justify-between">
-            <button
-              onClick={toggleFullscreen}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold flex items-center gap-2"
-            >
-              <Minimize2 size={16} /> Salir de pantalla completa
-            </button>
-            <div className="text-right">
-              <p className="text-white/60 text-sm">{session.area || "Area"} · {session.grade || "Grado"}</p>
-              <p className="text-white font-bold">{session.title}</p>
-            </div>
-          </div>
-
-          <div className="max-w-5xl space-y-7">
-            <p className="inline-flex px-5 py-2 rounded-full text-lg font-black bg-white/10 border border-white/15">
-              Pantalla completa
-            </p>
-            <h1 className="text-5xl md:text-7xl font-black leading-tight">
-              {currentMoment.name}
-            </h1>
-            {activityText && (
-              <div className="space-y-3">
-                <p className="text-white/50 text-xl md:text-2xl font-black uppercase tracking-wide">
-                  Actividad de aprendizaje
-                </p>
-                <p className="text-2xl md:text-3xl leading-relaxed text-white/85 max-w-4xl mx-auto line-clamp-6">
-                  {activityText}
-                </p>
-              </div>
-            )}
-            <div
-              className={`font-mono font-black leading-none tracking-tight ${
-                alertState === "critical"
-                  ? "text-red-300"
-                  : alertState === "soft"
-                    ? "text-amber-300"
-                    : alertState === "done"
-                      ? "text-emerald-300"
-                      : "text-white"
-              } ${timerScale === "gigante" ? "text-[140px] md:text-[220px]" : "text-[120px] md:text-[190px]"}`}
-            >
-              {formatClock(timeLeft)}
-            </div>
-            <ProgressBar value={currentProgress} color={primaryColor || momentColor} dark />
-          </div>
-
-          <div className="absolute bottom-8 flex flex-wrap justify-center gap-4">
-            <ClassButton onClick={goPrevious} icon={<SkipBack size={24} />} label="Anterior" dark />
-            <ClassButton
-              onClick={() => setIsActive((active) => !active)}
-              icon={isActive ? <Pause size={28} /> : <Play size={28} />}
-              label={isActive ? "Pausar" : timeLeft < currentDurationSeconds ? "Continuar" : "Iniciar"}
-              primary
-              dark
-            />
-            <ClassButton onClick={goNext} icon={<SkipForward size={24} />} label="Siguiente" dark />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const shellVars = {
+    "--ca-accent": accent,
+    "--ca-on-accent": onAccent,
+    "--ca-urgency": urgency.color,
+    fontSize: getFontSize(settings),
+  };
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden" style={shellStyle}>
-      <header
-        className="h-16 px-4 md:px-6 flex items-center justify-between shadow-sm"
-        style={{
-          backgroundColor: visualTheme.surface,
-          borderBottom: `1px solid ${visualTheme.border}`,
-        }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <a href="/sessions" className="p-2 rounded-xl hover:bg-slate-100 text-slate-500">
-            <ArrowLeft size={20} />
-          </a>
-          <div className="min-w-0">
-            <h1 className="font-black truncate" style={{ color: visualTheme.text }}>{session.title}</h1>
-            <p className="text-xs truncate" style={{ color: visualTheme.muted }}>
-              {session.area || "Area sin registrar"} · {session.grade || "Grado sin registrar"}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ModeToggle active={viewMode === "teacher"} onClick={() => setViewMode("teacher")} icon={<BookOpen size={15} />} label="Vista docente" />
-          <ModeToggle active={viewMode === "class"} onClick={() => setViewMode("class")} icon={<Eye size={15} />} label="Modo clase" />
-          <ModeToggle active={focusMode} onClick={() => setFocusMode((v) => !v)} icon={focusMode ? <EyeOff size={15} /> : <Eye size={15} />} label="Sin distracciones" />
-          <ModeToggle active={fullscreenMode} onClick={toggleFullscreen} icon={fullscreenMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />} label="Pantalla completa" />
-          <button
-            onClick={() => setShowLateStart(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold hover:bg-amber-100"
-          >
-            <AlertTriangle size={14} /> <span className="hidden sm:inline">Empece tarde</span>
-          </button>
-        </div>
-      </header>
+    <div className="fixed inset-0 z-[100] overflow-hidden bg-[#070B13] text-white" style={shellVars}>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.13),transparent_34%)]" />
+      <div className="relative flex h-full flex-col">
+        <TopBar
+          session={session}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          focusMode={focusMode}
+          setFocusMode={setFocusMode}
+          fullscreenMode={fullscreenMode}
+          toggleFullscreen={toggleFullscreen}
+          setShowLateStart={setShowLateStart}
+        />
 
-      <main className="h-[calc(100vh-4rem)] overflow-y-auto">
-        {viewMode === "teacher" ? (
-          <TeacherView
-            session={session}
-            moments={moments}
-            focusMode={focusMode}
-            currentMoment={currentMoment}
-            currentMomentIdx={currentMomentIdx}
-            currentSub={currentSub}
-            currentSubIdx={currentSubIdx}
-            currentActivityName={currentActivityName}
-            activityText={activityText}
-            teacherNote={teacherNote}
-            activityExpanded={activityExpanded}
-            setActivityExpanded={setActivityExpanded}
-            alertState={alertState}
-            momentColor={momentColor}
-            timeLeft={timeLeft}
-            totalSessionLeft={totalSessionLeft}
-            currentProgress={currentProgress}
-            generalProgress={generalProgress}
-            currentDurationSeconds={currentDurationSeconds}
-            isActive={isActive}
-            setIsActive={setIsActive}
-            goPrevious={goPrevious}
-            goNext={goNext}
-            setShowSummary={setShowSummary}
-            nextSub={nextSub}
-            nextMomentLabel={nextMomentLabel}
-            isLastActivity={isLastActivity}
-            primaryColor={primaryColor}
-            timerScale={timerScale}
-          />
-        ) : (
-          <ClassView
-            session={session}
-            currentMoment={currentMoment}
-            currentMomentIdx={currentMomentIdx}
-            moments={moments}
-            currentActivityName={currentActivityName}
-            activityText={activityText}
-            activityExpanded={activityExpanded}
-            setActivityExpanded={setActivityExpanded}
-            alertState={alertState}
-            momentColor={momentColor}
-            timeLeft={timeLeft}
-            totalSessionLeft={totalSessionLeft}
-            currentProgress={currentProgress}
-            generalProgress={generalProgress}
-            currentDurationSeconds={currentDurationSeconds}
-            isActive={isActive}
-            setIsActive={setIsActive}
-            goPrevious={goPrevious}
-            goNext={goNext}
-            setShowSummary={setShowSummary}
-            nextSub={nextSub}
-            nextMomentLabel={nextMomentLabel}
-            isLastActivity={isLastActivity}
-            focusMode={focusMode}
-            primaryColor={primaryColor}
-            timerScale={timerScale}
-          />
-        )}
-      </main>
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
+          {viewMode === "teacher" ? (
+            <TeacherView
+              session={session}
+              moments={moments}
+              focusMode={focusMode}
+              currentMoment={currentMoment}
+              currentMomentIdx={currentMomentIdx}
+              currentSub={currentSub}
+              currentSubIdx={currentSubIdx}
+              currentActivityName={currentActivityName}
+              activityText={activityText}
+              teacherNote={teacherNote}
+              activityExpanded={activityExpanded}
+              setActivityExpanded={setActivityExpanded}
+              urgency={urgency}
+              timeLeft={timeLeft}
+              totalSessionLeft={totalSessionLeft}
+              currentProgress={currentProgress}
+              generalProgress={generalProgress}
+              currentDurationSeconds={currentDurationSeconds}
+              isActive={isActive}
+              setIsActive={setIsActive}
+              goPrevious={goPrevious}
+              goNext={goNext}
+              setShowSummary={setShowSummary}
+              nextSub={nextSub}
+              nextMomentLabel={nextMomentLabel}
+              isLastActivity={isLastActivity}
+              timerSize={settings.timerSize}
+            />
+          ) : (
+            <ClassView
+              session={session}
+              moments={moments}
+              focusMode={focusMode}
+              currentMoment={currentMoment}
+              currentMomentIdx={currentMomentIdx}
+              currentActivityName={currentActivityName}
+              activityText={activityText}
+              activityExpanded={activityExpanded}
+              setActivityExpanded={setActivityExpanded}
+              urgency={urgency}
+              timeLeft={timeLeft}
+              totalSessionLeft={totalSessionLeft}
+              currentProgress={currentProgress}
+              generalProgress={generalProgress}
+              currentDurationSeconds={currentDurationSeconds}
+              isActive={isActive}
+              setIsActive={setIsActive}
+              goPrevious={goPrevious}
+              goNext={goNext}
+              setShowSummary={setShowSummary}
+              nextSub={nextSub}
+              nextMomentLabel={nextMomentLabel}
+              isLastActivity={isLastActivity}
+              timerSize={settings.timerSize}
+            />
+          )}
+        </main>
+      </div>
 
       {showLateStart && (
         <LateStartModal
@@ -681,111 +487,118 @@ export default function ClassModePage({ params }) {
   );
 }
 
-function StatusBadge({ alertState }) {
-  const config = {
-    normal: ["bg-blue-50 text-blue-700 border-blue-200", "En desarrollo"],
-    soft: ["bg-amber-50 text-amber-700 border-amber-200", "Quedan 5 min o menos"],
-    critical: ["bg-red-50 text-red-700 border-red-200", "Queda 1 min o menos"],
-    done: ["bg-emerald-50 text-emerald-700 border-emerald-200", "Momento finalizado"],
-  }[alertState];
+function TopBar({
+  session,
+  viewMode,
+  setViewMode,
+  focusMode,
+  setFocusMode,
+  fullscreenMode,
+  toggleFullscreen,
+  setShowLateStart,
+}) {
   return (
-    <div className={`px-3 py-2 rounded-xl border text-sm font-black ${config[0]}`}>
-      {config[1]}
-    </div>
+    <header className="relative z-10 flex min-h-16 items-center justify-between gap-3 border-b border-white/10 bg-slate-950/70 px-4 backdrop-blur-xl md:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <a href="/sessions" className="rounded-full border border-white/10 p-2 text-slate-300 transition hover:bg-white/10">
+          <ArrowLeft size={18} />
+        </a>
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-black text-white md:text-base">{session.title}</h1>
+          <p className="truncate text-xs text-slate-400">{session.area || "Área sin registrar"} · {session.grade || "Grado sin registrar"}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 overflow-x-auto">
+        <ModeButton active={viewMode === "teacher"} onClick={() => setViewMode("teacher")} icon={<BookOpen size={14} />} label="Vista docente" />
+        <ModeButton active={viewMode === "class"} onClick={() => setViewMode("class")} icon={<Eye size={14} />} label="Modo clase" />
+        <ModeButton active={focusMode} onClick={() => setFocusMode((v) => !v)} icon={focusMode ? <EyeOff size={14} /> : <Eye size={14} />} label="Sin distracciones" />
+        <ModeButton active={fullscreenMode} onClick={toggleFullscreen} icon={fullscreenMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} label="Pantalla completa" />
+        <button
+          onClick={() => setShowLateStart(true)}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-200 transition hover:bg-amber-300/15"
+        >
+          <AlertTriangle size={14} /> <span className="hidden sm:inline">Empecé tarde</span>
+        </button>
+      </div>
+    </header>
   );
 }
 
-function TeacherView({
-  moments,
-  focusMode,
-  currentMoment,
-  currentMomentIdx,
-  currentSub,
-  currentSubIdx,
-  currentActivityName,
-  activityText,
-  teacherNote,
-  activityExpanded,
-  setActivityExpanded,
-  alertState,
-  momentColor,
-  timeLeft,
-  totalSessionLeft,
-  currentProgress,
-  generalProgress,
-  currentDurationSeconds,
-  isActive,
-  setIsActive,
-  goPrevious,
-  goNext,
-  setShowSummary,
-  nextSub,
-  nextMomentLabel,
-  isLastActivity,
-  primaryColor,
-  timerScale,
-}) {
+function ModeButton({ active, onClick, icon, label }) {
   return (
-    <div className={`grid gap-4 p-4 md:p-5 ${focusMode ? "max-w-5xl mx-auto" : "xl:grid-cols-[1fr_320px] max-w-7xl mx-auto"}`}>
-      <section className="min-w-0">
-        <div
-          className="border rounded-3xl shadow-sm p-4 md:p-5 space-y-4"
-          style={{
-            backgroundColor: "var(--class-surface)",
-            borderColor: "var(--class-border)",
-            color: "var(--class-text)",
-          }}
-        >
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-            <div className="space-y-2">
-              <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--class-primary)" }}>
-                Vista docente
-              </p>
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-white text-xs font-black" style={{ backgroundColor: momentColor }}>
-                Momento {currentMomentIdx + 1} de {moments.length}
-              </span>
-              <h2 className="text-3xl md:text-4xl font-black leading-tight" style={{ color: "var(--class-text)" }}>
-                {currentMoment.name}
-              </h2>
-              <p className="text-sm font-semibold" style={{ color: "var(--class-muted)" }}>
-                Actividad de aprendizaje
-              </p>
-            </div>
-            <StatusBadge alertState={alertState} />
-          </div>
+    <button
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition"
+      style={{
+        backgroundColor: active ? "var(--ca-accent)" : "rgba(255,255,255,0.06)",
+        borderColor: active ? "var(--ca-accent)" : "rgba(255,255,255,0.1)",
+        color: active ? "var(--ca-on-accent)" : "#CBD5E1",
+      }}
+    >
+      {icon}
+      <span className="hidden md:inline">{label}</span>
+    </button>
+  );
+}
 
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_300px] gap-4">
-            <ActivityCard
+function TeacherView(props) {
+  const {
+    moments,
+    focusMode,
+    currentMoment,
+    currentMomentIdx,
+    currentSubIdx,
+    currentActivityName,
+    activityText,
+    teacherNote,
+    activityExpanded,
+    setActivityExpanded,
+    urgency,
+    timeLeft,
+    totalSessionLeft,
+    currentProgress,
+    generalProgress,
+    currentDurationSeconds,
+    isActive,
+    setIsActive,
+    goPrevious,
+    goNext,
+    setShowSummary,
+    nextSub,
+    nextMomentLabel,
+    isLastActivity,
+    timerSize,
+  } = props;
+
+  return (
+    <div className={`mx-auto grid max-w-7xl gap-5 ${focusMode ? "" : "xl:grid-cols-[minmax(0,1fr)_340px]"}`}>
+      <section className="min-w-0 rounded-[2rem] border border-white/10 bg-white/[0.055] p-5 shadow-2xl shadow-black/30 backdrop-blur-xl md:p-7">
+        <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
+          <div className="space-y-5">
+            <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Vista docente</p>
+            <div>
+              <p className="mb-2 text-sm font-bold text-slate-400">Momento {currentMomentIdx + 1} de {moments.length}</p>
+              <h2 className="text-4xl font-black leading-tight text-white md:text-6xl">{currentMoment.name}</h2>
+            </div>
+            <ActivityBlock
               title={currentActivityName}
-              activityText={activityText}
-              teacherNote={teacherNote}
+              text={activityText}
+              note={teacherNote}
               expanded={activityExpanded}
               setExpanded={setActivityExpanded}
-              compact
-            />
-            <TimerCard
-              timeLeft={timeLeft}
-              totalSessionLeft={totalSessionLeft}
-              alertState={alertState}
-              compact
-              timerScale={timerScale}
             />
           </div>
+          <TimerPanel
+            timeLeft={timeLeft}
+            totalSessionLeft={totalSessionLeft}
+            urgency={urgency}
+            large={false}
+            timerSize={timerSize}
+          />
+        </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <InfoCard label="Momento" value={formatMinutes(timeLeft)} icon={<Timer size={18} />} compact />
-            <InfoCard label="Sesion" value={formatMinutes(totalSessionLeft)} icon={<BookOpen size={18} />} compact />
-            <InfoCard label="Momento" value={`${Math.round(currentProgress)}%`} icon={<CheckCircle2 size={18} />} compact />
-            <InfoCard label="General" value={`${Math.round(generalProgress)}%`} icon={<Flag size={18} />} compact />
-          </div>
-
-          <div className="space-y-2">
-            <ProgressHeader label="Progreso del momento" value={currentProgress} />
-            <ProgressBar value={currentProgress} color={momentColor} />
-            <ProgressHeader label="Progreso general de la sesion" value={generalProgress} />
-            <ProgressBar value={generalProgress} color={primaryColor} />
-          </div>
-
+        <div className="mt-7 space-y-4">
+          <ProgressPair currentProgress={currentProgress} generalProgress={generalProgress} urgency={urgency} />
           <ControlRow
             isActive={isActive}
             setIsActive={setIsActive}
@@ -796,141 +609,77 @@ function TeacherView({
             setShowSummary={setShowSummary}
           />
         </div>
-
-        {focusMode && (
-          <div className="mt-4">
-            <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} />
-          </div>
-        )}
       </section>
 
       {!focusMode && (
         <aside className="space-y-4">
           <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} />
-          <SessionMap
-            moments={moments}
-            currentMomentIdx={currentMomentIdx}
-            currentSubIdx={currentSubIdx}
-          />
+          <SessionRoute moments={moments} currentMomentIdx={currentMomentIdx} currentSubIdx={currentSubIdx} />
         </aside>
       )}
     </div>
   );
 }
 
-function ClassView({
-  session,
-  currentMoment,
-  currentMomentIdx,
-  moments,
-  currentActivityName,
-  activityText,
-  activityExpanded,
-  setActivityExpanded,
-  alertState,
-  momentColor,
-  timeLeft,
-  totalSessionLeft,
-  currentProgress,
-  generalProgress,
-  currentDurationSeconds,
-  isActive,
-  setIsActive,
-  goPrevious,
-  goNext,
-  setShowSummary,
-  nextSub,
-  nextMomentLabel,
-  isLastActivity,
-  focusMode,
-  primaryColor,
-  timerScale,
-}) {
+function ClassView(props) {
+  const {
+    session,
+    moments,
+    focusMode,
+    currentMoment,
+    currentMomentIdx,
+    currentActivityName,
+    activityText,
+    activityExpanded,
+    setActivityExpanded,
+    urgency,
+    timeLeft,
+    totalSessionLeft,
+    currentProgress,
+    generalProgress,
+    currentDurationSeconds,
+    isActive,
+    setIsActive,
+    goPrevious,
+    goNext,
+    setShowSummary,
+    nextSub,
+    nextMomentLabel,
+    isLastActivity,
+    timerSize,
+  } = props;
+
   return (
-    <div
-      className="min-h-full"
-      style={{
-        background: `linear-gradient(135deg, var(--class-bg), var(--class-soft))`,
-      }}
-    >
-      <div className={`p-4 md:p-6 ${focusMode ? "max-w-5xl" : "max-w-6xl"} mx-auto`}>
-        <section
-          className="rounded-[28px] border shadow-xl p-5 md:p-8 space-y-6"
-          style={{
-            backgroundColor: "var(--class-surface)",
-            borderColor: "var(--class-border)",
-            color: "var(--class-text)",
-          }}
-        >
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--class-primary)" }}>
-                Modo clase
-              </p>
-              <h2 className="text-4xl md:text-6xl font-black leading-tight mt-2" style={{ color: "var(--class-text)" }}>
-                {currentMoment.name}
-              </h2>
-              <p className="text-sm mt-1" style={{ color: "var(--class-muted)" }}>
-                {session.area || "Area"} · {session.grade || "Grado"} · Momento {currentMomentIdx + 1} de {moments.length}
-              </p>
-            </div>
-            <StatusBadge alertState={alertState} />
-          </div>
+    <div className="mx-auto flex min-h-full max-w-6xl flex-col justify-center gap-5 py-4 text-center">
+      <section className="rounded-[2.5rem] border border-white/10 bg-white/[0.045] px-5 py-8 shadow-2xl shadow-black/40 backdrop-blur-xl md:px-10 md:py-10">
+        <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Modo clase</p>
+        <h2 className="mt-3 text-5xl font-black leading-none text-white md:text-7xl">{currentMoment.name}</h2>
+        <p className="mt-3 text-sm font-semibold text-slate-400">
+          {session.area || "Área"} · {session.grade || "Grado"} · Momento {currentMomentIdx + 1} de {moments.length}
+        </p>
 
-          <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-stretch">
-            <div
-              className="rounded-3xl border p-5 md:p-7 space-y-4"
-              style={{
-                backgroundColor: "var(--class-soft)",
-                borderColor: "var(--class-border)",
-              }}
-            >
-              <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--class-primary)" }}>
-                Actividad de aprendizaje
-              </p>
-              <h3 className="text-xl md:text-2xl font-black" style={{ color: "var(--class-text)" }}>
-                {currentActivityName}
-              </h3>
-              <p className={`text-lg md:text-xl leading-relaxed whitespace-pre-line ${activityExpanded ? "" : "line-clamp-5"}`} style={{ color: "var(--class-text)" }}>
-                {activityText || "Actividad sin descripcion registrada."}
-              </p>
-              {hasLongText(activityText) && (
-                <button
-                  onClick={() => setActivityExpanded((v) => !v)}
-                  className="px-4 py-2 rounded-xl border text-sm font-black hover:brightness-95"
-                  style={{
-                    backgroundColor: "var(--class-surface)",
-                    borderColor: "var(--class-border)",
-                    color: "var(--class-primary)",
-                  }}
-                >
-                  {activityExpanded ? "Ver menos" : "Ver completo"}
-                </button>
-              )}
-            </div>
+        <div className="mx-auto mt-8 max-w-4xl">
+          <TimerPanel
+            timeLeft={timeLeft}
+            totalSessionLeft={totalSessionLeft}
+            urgency={urgency}
+            large
+            timerSize={timerSize}
+          />
+        </div>
 
-            <TimerCard
-              timeLeft={timeLeft}
-              totalSessionLeft={totalSessionLeft}
-              alertState={alertState}
-              large
-              timerScale={timerScale}
-            />
-          </div>
+        <div className="mx-auto mt-7 max-w-3xl text-left">
+          <ActivityBlock
+            title={currentActivityName}
+            text={activityText}
+            expanded={activityExpanded}
+            setExpanded={setActivityExpanded}
+            clean
+          />
+        </div>
 
-          <div className="space-y-2">
-            <ProgressBar value={currentProgress} color={momentColor} />
-            <div className="flex items-center justify-between text-xs font-bold" style={{ color: "var(--class-muted)" }}>
-              <span>Progreso del momento</span>
-              <span>{Math.round(currentProgress)}%</span>
-            </div>
-            <ProgressBar value={generalProgress} color={primaryColor} />
-            <div className="flex items-center justify-between text-xs font-bold" style={{ color: "var(--class-muted)" }}>
-              <span>Progreso de la sesion</span>
-              <span>{Math.round(generalProgress)}%</span>
-            </div>
-          </div>
-
+        <div className="mx-auto mt-7 max-w-4xl space-y-4">
+          <ProgressPair currentProgress={currentProgress} generalProgress={generalProgress} urgency={urgency} />
           <ControlRow
             isActive={isActive}
             setIsActive={setIsActive}
@@ -939,106 +688,92 @@ function ClassView({
             goPrevious={goPrevious}
             goNext={goNext}
             setShowSummary={setShowSummary}
+            minimal
           />
-        </section>
+        </div>
+      </section>
 
-        {!focusMode && (
-          <div className="grid md:grid-cols-[1fr_1.4fr] gap-4 mt-4">
-            <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} />
-            <CompactMomentStrip moments={moments} currentMomentIdx={currentMomentIdx} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ActivityCard({
-  title,
-  activityText,
-  teacherNote,
-  expanded,
-  setExpanded,
-  compact,
-}) {
-  return (
-    <div className={`rounded-2xl bg-slate-50 border border-slate-200 ${compact ? "p-4" : "p-5"} space-y-3`}>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-lg font-black text-slate-900">{title}</h3>
-        {hasLongText(activityText) && (
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold text-slate-700 shrink-0"
-          >
-            {expanded ? "Ver menos" : "Ver completo"}
-          </button>
-        )}
-      </div>
-      <p className={`text-[15px] leading-relaxed text-slate-800 whitespace-pre-line ${expanded ? "" : "line-clamp-5"}`}>
-        {activityText || "No hay descripcion registrada para esta actividad. Puedes continuar con la guia de momentos."}
-      </p>
-      {teacherNote && (
-        <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
-          <p className="text-[11px] font-black uppercase tracking-wide text-amber-700 mb-1">
-            Nota docente
-          </p>
-          <p className="text-sm leading-relaxed text-amber-900 whitespace-pre-line">
-            {teacherNote}
-          </p>
+      {!focusMode && (
+        <div className="grid gap-4 md:grid-cols-[1fr_1.6fr]">
+          <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} compact />
+          <MomentChips moments={moments} currentMomentIdx={currentMomentIdx} />
         </div>
       )}
     </div>
   );
 }
 
-function TimerCard({ timeLeft, totalSessionLeft, alertState, compact, large, timerScale = "grande" }) {
-  const timerClass =
-    timerScale === "gigante"
-      ? large
-        ? "text-[116px] md:text-[178px]"
-        : "text-[96px] md:text-[136px]"
-      : large
-        ? "text-[96px] md:text-[150px]"
-        : "text-[82px] md:text-[116px]";
+function TimerPanel({ timeLeft, totalSessionLeft, urgency, large, timerSize }) {
   return (
-    <div className={`rounded-3xl bg-slate-950 text-white ${compact ? "p-5" : "p-6"} flex flex-col items-center justify-center min-h-[220px]`}>
-      <p className="text-white/60 text-sm font-bold uppercase tracking-wide mb-2">
-        Tiempo del momento
-      </p>
+    <div className="rounded-[2rem] border border-white/10 bg-black/35 p-6 shadow-inner shadow-black/40">
+      <div className="mb-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.25em]" style={{ color: urgency.color }}>
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: urgency.color }} />
+        {urgency.label}
+      </div>
       <div
-        className={`font-mono font-black leading-none tracking-tight ${
-          timerClass
-        } ${
-          alertState === "critical"
-            ? "text-red-300"
-            : alertState === "soft"
-              ? "text-amber-300"
-              : alertState === "done"
-                ? "text-emerald-300"
-                : "text-white"
-        }`}
+        className={`${getTimerClass(timerSize, large)} font-mono font-black leading-none tracking-tight`}
+        style={{ color: urgency.color, textShadow: `0 0 34px ${urgency.color}33` }}
       >
         {formatClock(timeLeft)}
       </div>
-      <p className="mt-3 text-white/70 text-sm">
-        Total restante: {formatMinutes(totalSessionLeft)}
-      </p>
+      <p className="mt-4 text-sm font-bold text-slate-400">Sesión restante: {formatMinutes(totalSessionLeft)}</p>
     </div>
   );
 }
 
-function ControlRow({
-  isActive,
-  setIsActive,
-  currentDurationSeconds,
-  timeLeft,
-  goPrevious,
-  goNext,
-  setShowSummary,
-}) {
+function ActivityBlock({ title, text, note, expanded, setExpanded, clean }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 pt-1">
-      <ClassButton onClick={goPrevious} icon={<SkipBack size={20} />} label="Anterior" />
+    <div className={`${clean ? "" : "rounded-3xl border border-white/10 bg-white/[0.045] p-4"} space-y-3`}>
+      <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Actividad de aprendizaje</p>
+      <h3 className="text-xl font-black text-white md:text-2xl">{title}</h3>
+      <p className={`whitespace-pre-line text-base leading-relaxed text-slate-200 md:text-lg ${expanded ? "" : "line-clamp-5"}`}>
+        {text || "Actividad sin descripción registrada."}
+      </p>
+      {hasLongText(text) && (
+        <button onClick={() => setExpanded((v) => !v)} className="text-sm font-black text-cyan-200 hover:text-white">
+          {expanded ? "Ver menos" : "Ver completo"}
+        </button>
+      )}
+      {note && (
+        <div className="rounded-2xl border border-amber-300/15 bg-amber-300/10 p-3">
+          <p className="text-[11px] font-black uppercase tracking-wide text-amber-200">Nota docente</p>
+          <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-amber-50">{note}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProgressPair({ currentProgress, generalProgress, urgency }) {
+  return (
+    <div className="space-y-3">
+      <ProgressBar label="Momento" value={currentProgress} color={urgency.color} />
+      <ProgressBar label="Sesión" value={generalProgress} color="var(--ca-accent)" />
+    </div>
+  );
+}
+
+function ProgressBar({ label, value, color }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+        <span>{label}</span>
+        <span>{Math.round(value)}%</span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${Math.max(0, Math.min(100, value))}%`, backgroundColor: color }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ControlRow({ isActive, setIsActive, currentDurationSeconds, timeLeft, goPrevious, goNext, setShowSummary, minimal }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+      <ClassButton onClick={goPrevious} icon={<SkipBack size={20} />} label="Anterior" quiet />
       <ClassButton
         onClick={() => setIsActive((active) => !active)}
         icon={isActive ? <Pause size={22} /> : <Play size={22} />}
@@ -1046,44 +781,75 @@ function ControlRow({
         primary
         className="col-span-2 md:col-span-2"
       />
-      <ClassButton onClick={goNext} icon={<SkipForward size={20} />} label="Siguiente" />
-      <ClassButton onClick={() => setShowSummary(true)} icon={<Flag size={20} />} label="Finalizar sesion" danger className="col-span-2" />
+      <ClassButton onClick={goNext} icon={<SkipForward size={20} />} label="Siguiente" quiet />
+      <ClassButton onClick={() => setShowSummary(true)} icon={<Flag size={20} />} label={minimal ? "Fin" : "Finalizar"} danger className="col-span-2" />
     </div>
   );
 }
 
-function SessionMap({ moments, currentMomentIdx, currentSubIdx }) {
+function ClassButton({ onClick, icon, label, primary, danger, quiet, className = "" }) {
+  const style = primary
+    ? { backgroundColor: "var(--ca-accent)", borderColor: "var(--ca-accent)", color: "var(--ca-on-accent)" }
+    : danger
+      ? { backgroundColor: "rgba(239,68,68,0.12)", borderColor: "rgba(248,113,113,0.25)", color: "#FCA5A5" }
+      : { backgroundColor: quiet ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.12)", color: "#E2E8F0" };
+
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
-      <h3 className="font-black text-slate-900">Mapa de la sesion</h3>
+    <button
+      onClick={onClick}
+      className={`min-h-13 rounded-2xl border px-4 py-3 text-sm font-black transition hover:brightness-110 active:scale-[0.99] ${className}`}
+      style={style}
+    >
+      <span className="flex items-center justify-center gap-2">{icon}{label}</span>
+    </button>
+  );
+}
+
+function NextMomentCard({ nextSub, nextMomentLabel, isLastActivity, compact }) {
+  return (
+    <div className={`rounded-3xl border border-white/10 bg-white/[0.045] ${compact ? "p-4" : "p-5"} text-left backdrop-blur-xl`}>
+      <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Próximo</p>
+      {nextSub ? (
+        <div className="mt-3 flex items-start gap-3">
+          <ChevronRight className="mt-1 shrink-0 text-cyan-200" size={18} />
+          <div className="min-w-0">
+            <h3 className="font-black text-white">{nextMomentLabel || "Siguiente actividad"}</h3>
+            <p className="mt-0.5 text-sm text-slate-300">{displayActivityName(nextSub.name)}</p>
+            <p className="mt-1 text-xs font-bold text-slate-500">{nextSub.duration || 0} min</p>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm font-bold text-emerald-200">
+          {isLastActivity ? "Último momento de la sesión" : "No hay siguiente momento"}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SessionRoute({ moments, currentMomentIdx, currentSubIdx }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 backdrop-blur-xl">
+      <p className="mb-4 text-xs font-black uppercase tracking-[0.25em] text-slate-500">Ruta de sesión</p>
       <div className="space-y-2">
         {moments.map((moment, momentIdx) => (
           <div
             key={moment.id || momentIdx}
-            className={`rounded-xl border p-3 ${
-              momentIdx === currentMomentIdx
-                ? "bg-blue-50 border-blue-200"
-                : momentIdx < currentMomentIdx
-                  ? "bg-emerald-50 border-emerald-100"
-                  : momentIdx === currentMomentIdx + 1
-                    ? "bg-amber-50 border-amber-100"
-                    : "bg-white border-slate-100"
-            }`}
+            className="rounded-2xl border px-3 py-3"
+            style={{
+              backgroundColor: momentIdx === currentMomentIdx ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.035)",
+              borderColor: momentIdx === currentMomentIdx ? "var(--ca-accent)" : "rgba(255,255,255,0.08)",
+            }}
           >
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: moment.color || COLORS[momentIdx % COLORS.length] }} />
-              <p className="text-sm font-bold text-slate-800 flex-1">{moment.name}</p>
-              {momentIdx < currentMomentIdx && <span className="text-[10px] font-black text-emerald-700">Hecho</span>}
-              {momentIdx === currentMomentIdx + 1 && <span className="text-[10px] font-black text-amber-700">Sigue</span>}
-              <span className="text-xs font-mono text-slate-400">{getMomentDuration(moment)}m</span>
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: moment.color || COLORS[momentIdx % COLORS.length] }} />
+              <p className="min-w-0 flex-1 truncate text-sm font-black text-white">{moment.name}</p>
+              <span className="font-mono text-xs text-slate-500">{getMomentDuration(moment)}m</span>
             </div>
             {momentIdx === currentMomentIdx && (
-              <div className="mt-2 ml-4 space-y-1">
+              <div className="mt-2 space-y-1 pl-4">
                 {(moment.submoments || []).map((sub, subIdx) => (
-                  <p
-                    key={sub.id || subIdx}
-                    className={`text-xs ${subIdx === currentSubIdx ? "font-bold text-blue-700" : "text-slate-500"}`}
-                  >
+                  <p key={sub.id || subIdx} className={`text-xs ${subIdx === currentSubIdx ? "font-black text-cyan-100" : "text-slate-500"}`}>
                     {subIdx + 1}. {displayActivityName(sub.name)}
                   </p>
                 ))}
@@ -1096,217 +862,50 @@ function SessionMap({ moments, currentMomentIdx, currentSubIdx }) {
   );
 }
 
-function CompactMomentStrip({ moments, currentMomentIdx }) {
+function MomentChips({ moments, currentMomentIdx }) {
   return (
-    <div className="bg-white/90 border border-white rounded-2xl shadow-sm p-4">
-      <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-3">
-        Ruta de la sesion
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+    <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-4 text-left backdrop-blur-xl">
+      <p className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-slate-500">Ruta</p>
+      <div className="flex flex-wrap gap-2">
         {moments.map((moment, idx) => (
-          <div
+          <span
             key={moment.id || idx}
-            className={`rounded-xl border px-3 py-2 ${
-              idx === currentMomentIdx
-                ? "bg-blue-600 text-white border-blue-600"
-                : idx < currentMomentIdx
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-100"
-                  : "bg-white text-slate-700 border-slate-100"
-            }`}
+            className="rounded-full border px-3 py-2 text-xs font-black"
+            style={{
+              backgroundColor: idx === currentMomentIdx ? "var(--ca-accent)" : idx < currentMomentIdx ? "rgba(34,197,94,0.13)" : "rgba(255,255,255,0.05)",
+              borderColor: idx === currentMomentIdx ? "var(--ca-accent)" : "rgba(255,255,255,0.1)",
+              color: idx === currentMomentIdx ? "var(--ca-on-accent)" : idx < currentMomentIdx ? "#BBF7D0" : "#CBD5E1",
+            }}
           >
-            <p className="text-sm font-black truncate">{moment.name}</p>
-            <p className={`text-xs ${idx === currentMomentIdx ? "text-white/70" : "text-slate-400"}`}>
-              {getMomentDuration(moment)} min
-            </p>
-          </div>
+            {moment.name} · {getMomentDuration(moment)}m
+          </span>
         ))}
       </div>
     </div>
   );
 }
 
-function ProgressHeader({ label, value }) {
+function LateStartModal({ lateMode, setLateMode, lateMinutes, setLateMinutes, remainingMinutesInput, setRemainingMinutesInput, onClose, onApply }) {
   return (
-    <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-      <span>{label}</span>
-      <span>{Math.round(value)}%</span>
-    </div>
-  );
-}
-
-function ProgressBar({ value, color, dark = false }) {
-  return (
-    <div className={`h-3 rounded-full overflow-hidden ${dark ? "bg-white/15" : "bg-slate-200"}`}>
-      <div
-        className="h-full rounded-full transition-all duration-500"
-        style={{ width: `${Math.max(0, Math.min(100, value))}%`, backgroundColor: color }}
-      />
-    </div>
-  );
-}
-
-function InfoCard({ label, value, icon, compact = false }) {
-  return (
-    <div className={`rounded-2xl border border-slate-200 bg-slate-50 ${compact ? "p-3" : "p-4"}`}>
-      <div className={`flex items-center gap-2 text-slate-400 ${compact ? "mb-1" : "mb-2"}`}>{icon}</div>
-      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{label}</p>
-      <p className={`${compact ? "text-base" : "text-lg"} font-black text-slate-900`}>{value}</p>
-    </div>
-  );
-}
-
-function ClassButton({ onClick, icon, label, primary, danger, dark, className = "" }) {
-  const cls = primary
-    ? ""
-    : danger
-      ? "bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
-      : dark
-        ? "bg-white/10 hover:bg-white/15 text-white border-white/15"
-        : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200";
-  return (
-    <button
-      onClick={onClick}
-      className={`min-h-14 px-4 py-3 rounded-2xl border flex items-center justify-center gap-2 text-sm md:text-base font-black shadow-sm active:scale-[0.99] transition ${cls} ${className}`}
-      style={
-        primary
-          ? {
-              backgroundColor: "var(--class-primary)",
-              borderColor: "var(--class-primary)",
-              color: "var(--class-on-primary)",
-            }
-          : undefined
-      }
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
-function ModeToggle({ active, onClick, icon, label }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold ${
-        active
-          ? ""
-          : "bg-white hover:bg-slate-50 text-slate-600 border-slate-200"
-      }`}
-      style={
-        active
-          ? {
-              backgroundColor: "var(--class-primary)",
-              borderColor: "var(--class-primary)",
-              color: "var(--class-on-primary)",
-            }
-          : undefined
-      }
-    >
-      {icon}
-      <span className="hidden md:inline">{label}</span>
-    </button>
-  );
-}
-
-function NextMomentCard({ nextSub, nextMomentLabel, isLastActivity }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-      <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-2">
-        Proximo momento
-      </p>
-      {nextSub ? (
-        <div className="flex items-start gap-3">
-          <ChevronRight className="text-blue-600 shrink-0 mt-1" size={18} />
-          <div className="min-w-0">
-            <h3 className="font-black text-slate-900">{nextMomentLabel || "Siguiente actividad"}</h3>
-            <p className="text-sm text-slate-600 mt-0.5">{nextSub.name}</p>
-            <p className="text-xs text-slate-400 mt-1">{nextSub.duration || 0} min</p>
-          </div>
-        </div>
-      ) : (
-        <p className="text-sm font-bold text-emerald-700">
-          {isLastActivity ? "Ultimo momento de la sesion" : "No hay siguiente momento"}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function LateStartModal({
-  lateMode,
-  setLateMode,
-  lateMinutes,
-  setLateMinutes,
-  remainingMinutesInput,
-  setRemainingMinutesInput,
-  onClose,
-  onApply,
-}) {
-  return (
-    <div className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 space-y-5">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
-            <AlertTriangle className="text-amber-500" size={20} /> Empece tarde
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X size={18} />
-          </button>
+          <h2 className="flex items-center gap-2 text-lg font-black"><AlertTriangle className="text-amber-300" size={20} /> Empecé tarde</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white"><X size={18} /></button>
         </div>
-        <p className="text-sm text-slate-500">
-          Redistribuye proporcionalmente el tiempo de las actividades que faltan.
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => setLateMode("delay")}
-            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "delay" ? "" : "border-slate-200 text-slate-600"}`}
-            style={
-              lateMode === "delay"
-                ? {
-                    backgroundColor: "var(--class-primary)",
-                    borderColor: "var(--class-primary)",
-                    color: "var(--class-on-primary)",
-                  }
-                : undefined
-            }
-          >
-            Retraso
-          </button>
-          <button
-            onClick={() => setLateMode("remaining")}
-            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "remaining" ? "" : "border-slate-200 text-slate-600"}`}
-            style={
-              lateMode === "remaining"
-                ? {
-                    backgroundColor: "var(--class-primary)",
-                    borderColor: "var(--class-primary)",
-                    color: "var(--class-on-primary)",
-                  }
-                : undefined
-            }
-          >
-            Tiempo real restante
-          </button>
+        <p className="mt-2 text-sm text-slate-400">Redistribuye proporcionalmente el tiempo de las actividades que faltan.</p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button onClick={() => setLateMode("delay")} className="rounded-2xl border px-3 py-3 text-sm font-black" style={lateMode === "delay" ? { backgroundColor: "var(--ca-accent)", borderColor: "var(--ca-accent)", color: "var(--ca-on-accent)" } : { borderColor: "rgba(255,255,255,0.1)", color: "#CBD5E1" }}>Retraso</button>
+          <button onClick={() => setLateMode("remaining")} className="rounded-2xl border px-3 py-3 text-sm font-black" style={lateMode === "remaining" ? { backgroundColor: "var(--ca-accent)", borderColor: "var(--ca-accent)", color: "var(--ca-on-accent)" } : { borderColor: "rgba(255,255,255,0.1)", color: "#CBD5E1" }}>Tiempo restante</button>
         </div>
-        {lateMode === "delay" ? (
-          <NumberField label="Minutos de retraso" value={lateMinutes} onChange={setLateMinutes} />
-        ) : (
-          <NumberField label="Minutos que quedan realmente" value={remainingMinutesInput} onChange={setRemainingMinutesInput} />
-        )}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold">
-            Cancelar
-          </button>
-          <button
-            onClick={onApply}
-            className="flex-1 py-3 rounded-xl font-black hover:brightness-95"
-            style={{
-              backgroundColor: "var(--class-primary)",
-              color: "var(--class-on-primary)",
-            }}
-          >
-            Aplicar ajuste
-          </button>
+        <NumberField
+          label={lateMode === "delay" ? "Minutos de retraso" : "Minutos que quedan realmente"}
+          value={lateMode === "delay" ? lateMinutes : remainingMinutesInput}
+          onChange={lateMode === "delay" ? setLateMinutes : setRemainingMinutesInput}
+        />
+        <div className="mt-5 flex gap-2">
+          <button onClick={onClose} className="flex-1 rounded-2xl border border-white/10 py-3 font-bold text-slate-300">Cancelar</button>
+          <button onClick={onApply} className="flex-1 rounded-2xl py-3 font-black" style={{ backgroundColor: "var(--ca-accent)", color: "var(--ca-on-accent)" }}>Aplicar</button>
         </div>
       </div>
     </div>
@@ -1315,12 +914,12 @@ function LateStartModal({
 
 function NumberField({ label, value, onChange }) {
   return (
-    <label className="block space-y-2">
-      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
+    <label className="mt-5 block space-y-2">
+      <span className="text-xs font-black uppercase tracking-wide text-slate-500">{label}</span>
       <input
         type="number"
         min="1"
-        className="w-full rounded-xl border border-slate-200 px-3 py-3 text-lg font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-400"
+        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-lg font-black text-white outline-none focus:border-cyan-200"
         value={value}
         onChange={(e) => onChange(Math.max(1, parseInt(e.target.value, 10) || 1))}
       />
@@ -1330,40 +929,36 @@ function NumberField({ label, value, onChange }) {
 
 function SummaryModal({ session, plannedSeconds, workedSeconds, completedCount, totalActivities, onRepeat }) {
   return (
-    <div className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-5">
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
-            <CheckCircle2 className="text-emerald-600" size={28} />
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-300/15">
+            <CheckCircle2 className="text-emerald-200" size={28} />
           </div>
-          <h2 className="text-2xl font-black text-slate-900">Sesion finalizada</h2>
-          <p className="text-sm text-slate-500">Resumen del trabajo en aula</p>
+          <h2 className="mt-3 text-2xl font-black">Sesión finalizada</h2>
+          <p className="text-sm text-slate-400">Resumen del trabajo en aula</p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <InfoCard label="Planificado" value={formatMinutes(plannedSeconds)} icon={<Timer size={18} />} />
-          <InfoCard label="Trabajado" value={formatMinutes(workedSeconds)} icon={<Play size={18} />} />
-          <InfoCard label="Completados" value={`${completedCount}/${totalActivities}`} icon={<CheckCircle2 size={18} />} />
-          <InfoCard label="Sesion" value={session.area || "Clase"} icon={<BookOpen size={18} />} />
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <SummaryItem label="Planificado" value={formatMinutes(plannedSeconds)} />
+          <SummaryItem label="Trabajado" value={formatMinutes(workedSeconds)} />
+          <SummaryItem label="Completados" value={`${completedCount}/${totalActivities}`} />
+          <SummaryItem label="Sesión" value={session.area || "Clase"} />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <a href="/sessions" className="py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-center hover:bg-slate-50">
-            Mis sesiones
-          </a>
-          <button onClick={onRepeat} className="py-3 rounded-xl border border-blue-200 text-blue-700 font-bold hover:bg-blue-50 flex items-center justify-center gap-2">
-            <RotateCcw size={16} /> Repetir
-          </button>
-          <a
-            href={`/create?id=${session.id}`}
-            className="py-3 rounded-xl font-black text-center hover:brightness-95"
-            style={{
-              backgroundColor: "var(--class-primary)",
-              color: "var(--class-on-primary)",
-            }}
-          >
-            Editar sesion
-          </a>
+        <div className="mt-5 grid gap-2 sm:grid-cols-3">
+          <a href="/sessions" className="rounded-2xl border border-white/10 py-3 text-center font-bold text-slate-300">Mis sesiones</a>
+          <button onClick={onRepeat} className="rounded-2xl border border-white/10 py-3 font-bold text-slate-300">Repetir</button>
+          <a href={`/create?id=${session.id}`} className="rounded-2xl py-3 text-center font-black" style={{ backgroundColor: "var(--ca-accent)", color: "var(--ca-on-accent)" }}>Editar</a>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SummaryItem({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-black text-white">{value}</p>
     </div>
   );
 }

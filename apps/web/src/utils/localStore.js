@@ -32,8 +32,8 @@ export function getTeacher() {
     defaultArea: "Comunicacion",
     defaultDuration: 90,
     classroomContext: "",
-    grade: "5.° primaria",
-    school: "I.E. José Olaya Balandra",
+    grade: "",
+    school: "",
   });
 }
 

@@ -19,13 +19,14 @@ export function Navbar({ theme }) {
 
   // Use CSS vars so theme applies automatically
   const navStyle = {
-    backgroundColor: "var(--ca-nav-bg, #fff)",
-    borderBottomColor: "var(--ca-nav-border, #e2e8f0)",
-    color: "var(--ca-nav-text, #1e293b)",
+    backgroundColor: "var(--ca-nav-bg, rgba(7, 11, 19, 0.92))",
+    borderBottomColor: "var(--ca-nav-border, rgba(255,255,255,0.1))",
+    color: "var(--ca-nav-text, #f8fafc)",
+    backdropFilter: "blur(18px)",
   };
 
   const linkCls =
-    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-black/5";
+    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors hover:bg-white/10";
 
   const navLinks = [
     { href: "/create", label: "Crear sesión", icon: <Plus size={15} /> },
@@ -83,7 +84,7 @@ export function Navbar({ theme }) {
 
           <a
             href="/settings"
-            className="p-2 rounded-lg hover:bg-black/5 transition-colors"
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
             title="Configuración"
             style={{ color: "var(--ca-text-muted)" }}
           >
@@ -93,7 +94,7 @@ export function Navbar({ theme }) {
           {teacher ? (
             <a
               href="/settings"
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-black/5 transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-full hover:bg-white/10 transition-colors text-sm font-medium"
             >
               <div
                 className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs"
@@ -120,7 +121,7 @@ export function Navbar({ theme }) {
 
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-black/5 transition-colors"
+              className="md:hidden p-2 rounded-full hover:bg-white/10 transition-colors"
             style={{ color: "var(--ca-text-muted)" }}
           >
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -142,7 +143,7 @@ export function Navbar({ theme }) {
               key={l.href}
               href={l.href}
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-black/5"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-white/10"
               style={{ color: "var(--ca-nav-text)" }}
             >
               {l.icon} {l.label}
@@ -159,7 +160,7 @@ export function Navbar({ theme }) {
           <a
             href="/settings"
             onClick={() => setMenuOpen(false)}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-black/5"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-white/10"
             style={{ color: "var(--ca-text-muted)" }}
           >
             <Settings size={15} /> Configuración
