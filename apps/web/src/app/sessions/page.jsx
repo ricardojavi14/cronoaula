@@ -10,6 +10,7 @@ import {
   Edit3,
   FileText,
   Layers,
+  MoreVertical,
   Play,
   Plus,
   Search,
@@ -218,7 +219,7 @@ export default function SessionsPage() {
 
       {filteredSessions.length > 0 ? (
         <section className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#0B1020] text-white shadow-xl">
-          <div className="hidden grid-cols-[minmax(0,1.5fr)_1fr_0.8fr_0.8fr_170px] gap-3 border-b border-white/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 md:grid">
+          <div className="hidden grid-cols-[minmax(220px,1.6fr)_minmax(180px,0.9fr)_120px_120px_220px] gap-4 border-b border-white/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 xl:grid">
             <span>Sesion</span>
             <span>Datos</span>
             <span>Duracion</span>
@@ -245,58 +246,81 @@ export default function SessionsPage() {
 }
 
 function SessionRow({ session, onDelete, onDuplicate, onExport }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const duration = getSessionDuration(session);
   const momentCount = getMomentCount(session);
   const classHref = `/class-mode/${session.id}`;
 
   return (
-    <article className="grid gap-3 px-4 py-4 transition hover:bg-white/[0.035] md:grid-cols-[minmax(0,1.5fr)_1fr_0.8fr_0.8fr_170px] md:items-center">
+    <article className="grid gap-3 px-4 py-4 transition hover:bg-white/[0.035] md:grid-cols-[minmax(0,1fr)_auto] md:items-center xl:grid-cols-[minmax(220px,1.6fr)_minmax(180px,0.9fr)_120px_120px_220px] xl:gap-4">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--ca-primary, #38BDF8)" }} />
-          <h2 className="truncate text-base font-black text-white">{session.title || "Sesion sin titulo"}</h2>
+          <h2 className="line-clamp-2 min-w-0 text-base font-black leading-snug text-white xl:truncate xl:whitespace-nowrap">{session.title || "Sesion sin titulo"}</h2>
         </div>
         <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
           <Calendar size={12} /> {formatDate(session)}
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs font-bold text-slate-300 md:block md:space-y-1">
-        <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 md:inline-block">{session.area || "Sin area"}</span>
-        <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 md:inline-block md:ml-1">{session.grade || "Sin grado"}</span>
+      <div className="flex min-w-0 flex-wrap gap-2 text-xs font-bold text-slate-300 md:col-span-2 xl:col-span-1 xl:block xl:space-y-1">
+        <span className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 xl:inline-block">{session.area || "Sin area"}</span>
+        <span className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 xl:inline-block xl:ml-1">{session.grade || "Sin grado"}</span>
       </div>
 
-      <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+      <div className="flex items-center gap-2 text-sm font-bold text-slate-300 md:col-span-1 xl:col-span-1">
         <Clock size={15} className="text-slate-500" /> {formatDuration(duration)}
       </div>
 
-      <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+      <div className="flex items-center gap-2 text-sm font-bold text-slate-300 md:col-span-1 xl:col-span-1">
         <Layers size={15} className="text-slate-500" /> {momentCount || "Sin"} momentos
       </div>
 
-      <div className="flex items-center gap-2 md:justify-end">
+      <div className="relative flex min-w-[210px] items-center gap-2 md:row-start-1 md:justify-end xl:row-auto">
         <a
           href={classHref}
           onClick={() => setLastSessionId(session.id)}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-xs font-black text-white transition hover:brightness-110 md:flex-none"
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 py-2.5 text-xs font-black text-white transition hover:brightness-110 md:flex-none"
           style={{ backgroundColor: "var(--ca-primary, #38BDF8)" }}
         >
           <Play size={13} fill="currentColor" /> Iniciar clase
         </a>
-        <a href={`/create?id=${session.id}`} className="rounded-full border border-white/10 p-2 text-slate-400 transition hover:bg-white/[0.08] hover:text-white" title="Editar">
-          <Edit3 size={14} />
-        </a>
-        <button onClick={() => onDuplicate(session)} className="rounded-full border border-white/10 p-2 text-slate-400 transition hover:bg-white/[0.08] hover:text-white" title="Duplicar">
-          <Copy size={14} />
+        <button
+          onClick={() => setMenuOpen((value) => !value)}
+          className="rounded-full border border-white/10 p-2.5 text-slate-400 transition hover:bg-white/[0.08] hover:text-white"
+          title="Mas acciones"
+        >
+          <MoreVertical size={15} />
         </button>
-        <button onClick={() => onExport(session.id)} className="rounded-full border border-white/10 p-2 text-slate-400 transition hover:bg-white/[0.08] hover:text-white" title="Exportar">
-          <Download size={14} />
-        </button>
-        <button onClick={() => onDelete(session.id)} className="rounded-full border border-white/10 p-2 text-slate-500 transition hover:border-red-400/30 hover:bg-red-500/10 hover:text-red-300" title="Eliminar">
-          <Trash2 size={14} />
-        </button>
+        {menuOpen && (
+          <div className="absolute right-0 top-12 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#111827] p-1.5 shadow-2xl">
+            <ActionLink href={`/create?id=${session.id}`} icon={<Edit3 size={14} />} label="Editar" />
+            <ActionButton onClick={() => { onDuplicate(session); setMenuOpen(false); }} icon={<Copy size={14} />} label="Duplicar" />
+            <ActionButton onClick={() => { onExport(session.id); setMenuOpen(false); }} icon={<Download size={14} />} label="Exportar" />
+            <ActionButton danger onClick={() => { onDelete(session.id); setMenuOpen(false); }} icon={<Trash2 size={14} />} label="Eliminar" />
+          </div>
+        )}
       </div>
     </article>
+  );
+}
+
+function ActionLink({ href, icon, label }) {
+  return (
+    <a href={href} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/[0.08]">
+      {icon} {label}
+    </a>
+  );
+}
+
+function ActionButton({ onClick, icon, label, danger }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-bold transition hover:bg-white/[0.08] ${danger ? "text-red-300" : "text-slate-200"}`}
+    >
+      {icon} {label}
+    </button>
   );
 }
 

@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS = {
   theme: "oscuro", // claro | oscuro | contraste | calido | colorido | minimalista
   primaryColor: "#38BDF8", // hex
   secondaryColor: "#059669",
+  fontFamily: "system", // system | rounded | serif
   fontSize: "normal", // pequeño | normal | grande | gigante
   density: "normal", // compacta | normal | amplia
   borderStyle: "redondeados", // suaves | redondeados | rectos
@@ -25,14 +26,24 @@ export const DEFAULT_SETTINGS = {
   defaultClassView: "class", // teacher | class
   showCurrentMoment: true,
   showNextMoment: true,
+  showActivityInClass: true,
+  showMomentChips: true,
   showProgressBar: true,
+  showMomentProgress: true,
+  showSessionProgress: true,
   showTeacherNotes: true,
   showTotalTimeLeft: true,
   showMomentTimeLeft: true,
+  autoAdvanceMoments: false,
+  pauseAtMomentEnd: true,
   darkModeInClass: false,
   highContrastMode: false,
   distractionFree: false,
   soundAlerts: true,
+  alertVolume: "medio", // bajo | medio
+  earlyAlert: true,
+  beepLast15: false,
+  muteAll: false,
   alertSound: "beep", // beep | bell | chime | soft
   vibration: true,
   alertAt5min: false,
