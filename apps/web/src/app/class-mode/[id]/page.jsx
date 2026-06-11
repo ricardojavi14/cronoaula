@@ -138,6 +138,7 @@ export default function ClassModePage({ params }) {
   const [currentSubIdx, setCurrentSubIdx] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
+  const [viewMode, setViewMode] = useState("teacher");
   const [projectorMode, setProjectorMode] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
@@ -456,7 +457,8 @@ export default function ClassModePage({ params }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <ModeToggle active onClick={() => setProjectorMode(false)} icon={<BookOpen size={15} />} label="Vista docente" />
+          <ModeToggle active={viewMode === "teacher"} onClick={() => setViewMode("teacher")} icon={<BookOpen size={15} />} label="Vista docente" />
+          <ModeToggle active={viewMode === "class"} onClick={() => setViewMode("class")} icon={<Eye size={15} />} label="Vista de clase" />
           <ModeToggle active={focusMode} onClick={() => setFocusMode((v) => !v)} icon={focusMode ? <EyeOff size={15} /> : <Eye size={15} />} label="Sin distracciones" />
           <ModeToggle onClick={() => setProjectorMode(true)} icon={<Maximize2 size={15} />} label="Modo proyector" />
           <button
@@ -469,164 +471,64 @@ export default function ClassModePage({ params }) {
       </header>
 
       <main className="h-[calc(100vh-4rem)] overflow-y-auto">
-        <div className={`grid gap-5 p-4 md:p-6 ${focusMode ? "max-w-5xl mx-auto" : "xl:grid-cols-[1fr_340px] max-w-7xl mx-auto"}`}>
-          <section className="space-y-4 min-w-0">
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 md:p-6 space-y-4">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div className="space-y-2">
-                  <p className="text-xs font-black text-blue-600 uppercase tracking-wide">
-                    Vista docente
-                  </p>
-                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-white text-xs font-black" style={{ backgroundColor: momentColor }}>
-                    Momento {currentMomentIdx + 1} de {moments.length}
-                  </span>
-                  <h2 className="text-2xl md:text-4xl font-black text-slate-900 leading-tight">
-                    {currentMoment.name}
-                  </h2>
-                  <p className="text-sm md:text-base text-slate-500 font-medium">
-                    Actividad de aprendizaje
-                  </p>
-                </div>
-                <StatusBadge alertState={alertState} />
-              </div>
-
-              <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-stretch">
-                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 md:p-5 space-y-3 min-h-[220px]">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-lg font-black text-slate-900">
-                      {currentActivityName}
-                    </h3>
-                    {hasLongText(activityText) && (
-                      <button
-                        onClick={() => setActivityExpanded((v) => !v)}
-                        className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold text-slate-700 shrink-0"
-                      >
-                        {activityExpanded ? "Ver menos" : "Ver completo"}
-                      </button>
-                    )}
-                  </div>
-                  <p className={`text-[15px] md:text-base leading-relaxed text-slate-800 whitespace-pre-line ${activityExpanded ? "" : "line-clamp-5"}`}>
-                    {activityText || "No hay descripcion registrada para esta actividad. Puedes continuar con la guia de momentos."}
-                  </p>
-                  {teacherNote && (
-                    <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
-                      <p className="text-[11px] font-black uppercase tracking-wide text-amber-700 mb-1">
-                        Nota docente
-                      </p>
-                      <p className="text-sm leading-relaxed text-amber-900 whitespace-pre-line">
-                        {teacherNote}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-3xl bg-slate-950 text-white p-5 md:p-6 flex flex-col items-center justify-center min-h-[220px]">
-                  <p className="text-white/60 text-sm font-bold uppercase tracking-wide mb-2">
-                    Tiempo del momento
-                  </p>
-                  <div
-                    className={`font-mono font-black leading-none tracking-tight text-[82px] md:text-[118px] ${
-                      alertState === "critical"
-                        ? "text-red-300"
-                        : alertState === "soft"
-                          ? "text-amber-300"
-                          : alertState === "done"
-                            ? "text-emerald-300"
-                            : "text-white"
-                    }`}
-                  >
-                    {formatClock(timeLeft)}
-                  </div>
-                  <p className="mt-3 text-white/70 text-sm">
-                    Total restante: {formatMinutes(totalSessionLeft)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <InfoCard label="Momento restante" value={formatMinutes(timeLeft)} icon={<Timer size={18} />} compact />
-                <InfoCard label="Sesion restante" value={formatMinutes(totalSessionLeft)} icon={<BookOpen size={18} />} compact />
-                <InfoCard label="Progreso momento" value={`${Math.round(currentProgress)}%`} icon={<CheckCircle2 size={18} />} compact />
-                <InfoCard label="Progreso general" value={`${Math.round(generalProgress)}%`} icon={<Flag size={18} />} compact />
-              </div>
-
-              <div className="space-y-2">
-                <ProgressHeader label="Progreso del momento" value={currentProgress} />
-                <ProgressBar value={currentProgress} color={momentColor} />
-                <ProgressHeader label="Progreso general de la sesion" value={generalProgress} />
-                <ProgressBar value={generalProgress} color="#2563EB" />
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3 pt-1">
-                <ClassButton onClick={goPrevious} icon={<SkipBack size={20} />} label="Anterior" />
-                <ClassButton
-                  onClick={() => setIsActive((active) => !active)}
-                  icon={isActive ? <Pause size={22} /> : <Play size={22} />}
-                  label={isActive ? "Pausar" : timeLeft < currentDurationSeconds ? "Continuar" : "Iniciar"}
-                  primary
-                  className="col-span-2 md:col-span-2"
-                />
-                <ClassButton onClick={goNext} icon={<SkipForward size={20} />} label="Siguiente" />
-                <ClassButton onClick={() => setShowSummary(true)} icon={<Flag size={20} />} label="Finalizar sesion" danger className="col-span-2" />
-              </div>
-            </div>
-
-            {focusMode && <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} />}
-          </section>
-
-          {!focusMode && (
-            <aside className="space-y-5">
-              <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} />
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
-                <h3 className="font-black text-slate-900">Mapa de la sesion</h3>
-                <div className="space-y-2">
-                  {moments.map((moment, momentIdx) => (
-                    <div
-                      key={moment.id || momentIdx}
-                      className={`rounded-xl border p-3 ${
-                        momentIdx === currentMomentIdx
-                          ? "bg-blue-50 border-blue-200"
-                          : momentIdx < currentMomentIdx
-                            ? "bg-emerald-50 border-emerald-100"
-                            : momentIdx === currentMomentIdx + 1
-                              ? "bg-amber-50 border-amber-100"
-                              : "bg-white border-slate-100"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: moment.color || COLORS[momentIdx % COLORS.length] }} />
-                        <p className="text-sm font-bold text-slate-800 flex-1">{moment.name}</p>
-                        {momentIdx < currentMomentIdx && (
-                          <span className="text-[10px] font-black text-emerald-700">
-                            Hecho
-                          </span>
-                        )}
-                        {momentIdx === currentMomentIdx + 1 && (
-                          <span className="text-[10px] font-black text-amber-700">
-                            Sigue
-                          </span>
-                        )}
-                        <span className="text-xs font-mono text-slate-400">{getMomentDuration(moment)}m</span>
-                      </div>
-                      {momentIdx === currentMomentIdx && (
-                        <div className="mt-2 ml-4 space-y-1">
-                          {(moment.submoments || []).map((sub, subIdx) => (
-                            <p
-                              key={sub.id || subIdx}
-                              className={`text-xs ${subIdx === currentSubIdx ? "font-bold text-blue-700" : "text-slate-500"}`}
-                            >
-                              {subIdx + 1}. {sub.name}
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </aside>
-          )}
-        </div>
+        {viewMode === "teacher" ? (
+          <TeacherView
+            session={session}
+            moments={moments}
+            focusMode={focusMode}
+            currentMoment={currentMoment}
+            currentMomentIdx={currentMomentIdx}
+            currentSub={currentSub}
+            currentSubIdx={currentSubIdx}
+            currentActivityName={currentActivityName}
+            activityText={activityText}
+            teacherNote={teacherNote}
+            activityExpanded={activityExpanded}
+            setActivityExpanded={setActivityExpanded}
+            alertState={alertState}
+            momentColor={momentColor}
+            timeLeft={timeLeft}
+            totalSessionLeft={totalSessionLeft}
+            currentProgress={currentProgress}
+            generalProgress={generalProgress}
+            currentDurationSeconds={currentDurationSeconds}
+            isActive={isActive}
+            setIsActive={setIsActive}
+            goPrevious={goPrevious}
+            goNext={goNext}
+            setShowSummary={setShowSummary}
+            nextSub={nextSub}
+            nextMomentLabel={nextMomentLabel}
+            isLastActivity={isLastActivity}
+          />
+        ) : (
+          <ClassView
+            session={session}
+            currentMoment={currentMoment}
+            currentMomentIdx={currentMomentIdx}
+            moments={moments}
+            currentActivityName={currentActivityName}
+            activityText={activityText}
+            activityExpanded={activityExpanded}
+            setActivityExpanded={setActivityExpanded}
+            alertState={alertState}
+            momentColor={momentColor}
+            timeLeft={timeLeft}
+            totalSessionLeft={totalSessionLeft}
+            currentProgress={currentProgress}
+            generalProgress={generalProgress}
+            currentDurationSeconds={currentDurationSeconds}
+            isActive={isActive}
+            setIsActive={setIsActive}
+            goPrevious={goPrevious}
+            goNext={goNext}
+            setShowSummary={setShowSummary}
+            nextSub={nextSub}
+            nextMomentLabel={nextMomentLabel}
+            isLastActivity={isLastActivity}
+            focusMode={focusMode}
+          />
+        )}
       </main>
 
       {showLateStart && (
@@ -666,6 +568,392 @@ function StatusBadge({ alertState }) {
   return (
     <div className={`px-3 py-2 rounded-xl border text-sm font-black ${config[0]}`}>
       {config[1]}
+    </div>
+  );
+}
+
+function TeacherView({
+  moments,
+  focusMode,
+  currentMoment,
+  currentMomentIdx,
+  currentSub,
+  currentSubIdx,
+  currentActivityName,
+  activityText,
+  teacherNote,
+  activityExpanded,
+  setActivityExpanded,
+  alertState,
+  momentColor,
+  timeLeft,
+  totalSessionLeft,
+  currentProgress,
+  generalProgress,
+  currentDurationSeconds,
+  isActive,
+  setIsActive,
+  goPrevious,
+  goNext,
+  setShowSummary,
+  nextSub,
+  nextMomentLabel,
+  isLastActivity,
+}) {
+  return (
+    <div className={`grid gap-4 p-4 md:p-5 ${focusMode ? "max-w-5xl mx-auto" : "xl:grid-cols-[1fr_320px] max-w-7xl mx-auto"}`}>
+      <section className="min-w-0">
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-4 md:p-5 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+            <div className="space-y-2">
+              <p className="text-xs font-black text-blue-600 uppercase tracking-wide">
+                Vista docente
+              </p>
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-white text-xs font-black" style={{ backgroundColor: momentColor }}>
+                Momento {currentMomentIdx + 1} de {moments.length}
+              </span>
+              <h2 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight">
+                {currentMoment.name}
+              </h2>
+              <p className="text-sm text-slate-500 font-semibold">
+                Actividad de aprendizaje
+              </p>
+            </div>
+            <StatusBadge alertState={alertState} />
+          </div>
+
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_300px] gap-4">
+            <ActivityCard
+              title={currentActivityName}
+              activityText={activityText}
+              teacherNote={teacherNote}
+              expanded={activityExpanded}
+              setExpanded={setActivityExpanded}
+              compact
+            />
+            <TimerCard
+              timeLeft={timeLeft}
+              totalSessionLeft={totalSessionLeft}
+              alertState={alertState}
+              compact
+            />
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <InfoCard label="Momento" value={formatMinutes(timeLeft)} icon={<Timer size={18} />} compact />
+            <InfoCard label="Sesion" value={formatMinutes(totalSessionLeft)} icon={<BookOpen size={18} />} compact />
+            <InfoCard label="Momento" value={`${Math.round(currentProgress)}%`} icon={<CheckCircle2 size={18} />} compact />
+            <InfoCard label="General" value={`${Math.round(generalProgress)}%`} icon={<Flag size={18} />} compact />
+          </div>
+
+          <div className="space-y-2">
+            <ProgressHeader label="Progreso del momento" value={currentProgress} />
+            <ProgressBar value={currentProgress} color={momentColor} />
+            <ProgressHeader label="Progreso general de la sesion" value={generalProgress} />
+            <ProgressBar value={generalProgress} color="#2563EB" />
+          </div>
+
+          <ControlRow
+            isActive={isActive}
+            setIsActive={setIsActive}
+            currentDurationSeconds={currentDurationSeconds}
+            timeLeft={timeLeft}
+            goPrevious={goPrevious}
+            goNext={goNext}
+            setShowSummary={setShowSummary}
+          />
+        </div>
+
+        {focusMode && (
+          <div className="mt-4">
+            <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} />
+          </div>
+        )}
+      </section>
+
+      {!focusMode && (
+        <aside className="space-y-4">
+          <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} />
+          <SessionMap
+            moments={moments}
+            currentMomentIdx={currentMomentIdx}
+            currentSubIdx={currentSubIdx}
+          />
+        </aside>
+      )}
+    </div>
+  );
+}
+
+function ClassView({
+  session,
+  currentMoment,
+  currentMomentIdx,
+  moments,
+  currentActivityName,
+  activityText,
+  activityExpanded,
+  setActivityExpanded,
+  alertState,
+  momentColor,
+  timeLeft,
+  totalSessionLeft,
+  currentProgress,
+  generalProgress,
+  currentDurationSeconds,
+  isActive,
+  setIsActive,
+  goPrevious,
+  goNext,
+  setShowSummary,
+  nextSub,
+  nextMomentLabel,
+  isLastActivity,
+  focusMode,
+}) {
+  return (
+    <div className="min-h-full bg-gradient-to-br from-blue-50 via-white to-emerald-50">
+      <div className={`p-4 md:p-6 ${focusMode ? "max-w-5xl" : "max-w-6xl"} mx-auto`}>
+        <section className="rounded-[28px] bg-white/90 border border-white shadow-xl p-5 md:p-8 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <p className="text-xs font-black text-blue-600 uppercase tracking-wide">
+                Vista de clase
+              </p>
+              <h2 className="text-4xl md:text-6xl font-black text-slate-900 leading-tight mt-2">
+                {currentMoment.name}
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">
+                {session.area || "Area"} · {session.grade || "Grado"} · Momento {currentMomentIdx + 1} de {moments.length}
+              </p>
+            </div>
+            <StatusBadge alertState={alertState} />
+          </div>
+
+          <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-stretch">
+            <div className="rounded-3xl border border-blue-100 bg-blue-50/70 p-5 md:p-7 space-y-4">
+              <p className="text-xs font-black text-blue-700 uppercase tracking-wide">
+                Actividad de aprendizaje
+              </p>
+              <h3 className="text-xl md:text-2xl font-black text-slate-900">
+                {currentActivityName}
+              </h3>
+              <p className={`text-lg md:text-xl leading-relaxed text-slate-800 whitespace-pre-line ${activityExpanded ? "" : "line-clamp-5"}`}>
+                {activityText || "Actividad sin descripcion registrada."}
+              </p>
+              {hasLongText(activityText) && (
+                <button
+                  onClick={() => setActivityExpanded((v) => !v)}
+                  className="px-4 py-2 rounded-xl bg-white border border-blue-100 text-blue-700 text-sm font-black hover:bg-blue-50"
+                >
+                  {activityExpanded ? "Ver menos" : "Ver completo"}
+                </button>
+              )}
+            </div>
+
+            <TimerCard
+              timeLeft={timeLeft}
+              totalSessionLeft={totalSessionLeft}
+              alertState={alertState}
+              large
+            />
+          </div>
+
+          <div className="space-y-2">
+            <ProgressBar value={currentProgress} color={momentColor} />
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+              <span>Progreso del momento</span>
+              <span>{Math.round(currentProgress)}%</span>
+            </div>
+            <ProgressBar value={generalProgress} color="#2563EB" />
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+              <span>Progreso de la sesion</span>
+              <span>{Math.round(generalProgress)}%</span>
+            </div>
+          </div>
+
+          <ControlRow
+            isActive={isActive}
+            setIsActive={setIsActive}
+            currentDurationSeconds={currentDurationSeconds}
+            timeLeft={timeLeft}
+            goPrevious={goPrevious}
+            goNext={goNext}
+            setShowSummary={setShowSummary}
+          />
+        </section>
+
+        {!focusMode && (
+          <div className="grid md:grid-cols-[1fr_1.4fr] gap-4 mt-4">
+            <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} />
+            <CompactMomentStrip moments={moments} currentMomentIdx={currentMomentIdx} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ActivityCard({
+  title,
+  activityText,
+  teacherNote,
+  expanded,
+  setExpanded,
+  compact,
+}) {
+  return (
+    <div className={`rounded-2xl bg-slate-50 border border-slate-200 ${compact ? "p-4" : "p-5"} space-y-3`}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-black text-slate-900">{title}</h3>
+        {hasLongText(activityText) && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold text-slate-700 shrink-0"
+          >
+            {expanded ? "Ver menos" : "Ver completo"}
+          </button>
+        )}
+      </div>
+      <p className={`text-[15px] leading-relaxed text-slate-800 whitespace-pre-line ${expanded ? "" : "line-clamp-5"}`}>
+        {activityText || "No hay descripcion registrada para esta actividad. Puedes continuar con la guia de momentos."}
+      </p>
+      {teacherNote && (
+        <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
+          <p className="text-[11px] font-black uppercase tracking-wide text-amber-700 mb-1">
+            Nota docente
+          </p>
+          <p className="text-sm leading-relaxed text-amber-900 whitespace-pre-line">
+            {teacherNote}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TimerCard({ timeLeft, totalSessionLeft, alertState, compact, large }) {
+  return (
+    <div className={`rounded-3xl bg-slate-950 text-white ${compact ? "p-5" : "p-6"} flex flex-col items-center justify-center min-h-[220px]`}>
+      <p className="text-white/60 text-sm font-bold uppercase tracking-wide mb-2">
+        Tiempo del momento
+      </p>
+      <div
+        className={`font-mono font-black leading-none tracking-tight ${
+          large ? "text-[96px] md:text-[150px]" : "text-[82px] md:text-[116px]"
+        } ${
+          alertState === "critical"
+            ? "text-red-300"
+            : alertState === "soft"
+              ? "text-amber-300"
+              : alertState === "done"
+                ? "text-emerald-300"
+                : "text-white"
+        }`}
+      >
+        {formatClock(timeLeft)}
+      </div>
+      <p className="mt-3 text-white/70 text-sm">
+        Total restante: {formatMinutes(totalSessionLeft)}
+      </p>
+    </div>
+  );
+}
+
+function ControlRow({
+  isActive,
+  setIsActive,
+  currentDurationSeconds,
+  timeLeft,
+  goPrevious,
+  goNext,
+  setShowSummary,
+}) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 pt-1">
+      <ClassButton onClick={goPrevious} icon={<SkipBack size={20} />} label="Anterior" />
+      <ClassButton
+        onClick={() => setIsActive((active) => !active)}
+        icon={isActive ? <Pause size={22} /> : <Play size={22} />}
+        label={isActive ? "Pausar" : timeLeft < currentDurationSeconds ? "Continuar" : "Iniciar"}
+        primary
+        className="col-span-2 md:col-span-2"
+      />
+      <ClassButton onClick={goNext} icon={<SkipForward size={20} />} label="Siguiente" />
+      <ClassButton onClick={() => setShowSummary(true)} icon={<Flag size={20} />} label="Finalizar sesion" danger className="col-span-2" />
+    </div>
+  );
+}
+
+function SessionMap({ moments, currentMomentIdx, currentSubIdx }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+      <h3 className="font-black text-slate-900">Mapa de la sesion</h3>
+      <div className="space-y-2">
+        {moments.map((moment, momentIdx) => (
+          <div
+            key={moment.id || momentIdx}
+            className={`rounded-xl border p-3 ${
+              momentIdx === currentMomentIdx
+                ? "bg-blue-50 border-blue-200"
+                : momentIdx < currentMomentIdx
+                  ? "bg-emerald-50 border-emerald-100"
+                  : momentIdx === currentMomentIdx + 1
+                    ? "bg-amber-50 border-amber-100"
+                    : "bg-white border-slate-100"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: moment.color || COLORS[momentIdx % COLORS.length] }} />
+              <p className="text-sm font-bold text-slate-800 flex-1">{moment.name}</p>
+              {momentIdx < currentMomentIdx && <span className="text-[10px] font-black text-emerald-700">Hecho</span>}
+              {momentIdx === currentMomentIdx + 1 && <span className="text-[10px] font-black text-amber-700">Sigue</span>}
+              <span className="text-xs font-mono text-slate-400">{getMomentDuration(moment)}m</span>
+            </div>
+            {momentIdx === currentMomentIdx && (
+              <div className="mt-2 ml-4 space-y-1">
+                {(moment.submoments || []).map((sub, subIdx) => (
+                  <p
+                    key={sub.id || subIdx}
+                    className={`text-xs ${subIdx === currentSubIdx ? "font-bold text-blue-700" : "text-slate-500"}`}
+                  >
+                    {subIdx + 1}. {displayActivityName(sub.name)}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CompactMomentStrip({ moments, currentMomentIdx }) {
+  return (
+    <div className="bg-white/90 border border-white rounded-2xl shadow-sm p-4">
+      <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-3">
+        Ruta de la sesion
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {moments.map((moment, idx) => (
+          <div
+            key={moment.id || idx}
+            className={`rounded-xl border px-3 py-2 ${
+              idx === currentMomentIdx
+                ? "bg-blue-600 text-white border-blue-600"
+                : idx < currentMomentIdx
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-100"
+                  : "bg-white text-slate-700 border-slate-100"
+            }`}
+          >
+            <p className="text-sm font-black truncate">{moment.name}</p>
+            <p className={`text-xs ${idx === currentMomentIdx ? "text-white/70" : "text-slate-400"}`}>
+              {getMomentDuration(moment)} min
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
