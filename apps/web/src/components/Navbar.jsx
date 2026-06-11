@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   BookOpen,
   Plus,
@@ -12,10 +12,29 @@ import {
   Settings,
 } from "lucide-react";
 import { useTeacher } from "@/app/client-layout";
+import { getLastOrRecentSession, setLastSessionId } from "@/utils/localStore";
 
 export function Navbar({ theme }) {
   const { teacher } = useTeacher();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [classModeHref, setClassModeHref] = useState("/sessions");
+  const [classModeSessionId, setClassModeSessionId] = useState("");
+
+  useEffect(() => {
+    const refreshClassModeHref = () => {
+      const session = getLastOrRecentSession();
+      setClassModeHref(session?.id ? `/class-mode/${session.id}` : "/sessions");
+      setClassModeSessionId(session?.id || "");
+    };
+
+    refreshClassModeHref();
+    window.addEventListener("storage", refreshClassModeHref);
+    window.addEventListener("focus", refreshClassModeHref);
+    return () => {
+      window.removeEventListener("storage", refreshClassModeHref);
+      window.removeEventListener("focus", refreshClassModeHref);
+    };
+  }, []);
 
   // Use CSS vars so theme applies automatically
   const navStyle = {
@@ -75,7 +94,8 @@ export function Navbar({ theme }) {
         {/* Right */}
         <div className="flex items-center gap-2">
           <a
-            href="/sessions"
+            href={classModeHref}
+            onClick={() => classModeSessionId && setLastSessionId(classModeSessionId)}
             className="hidden sm:flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90"
             style={{ backgroundColor: "var(--ca-primary, #2563EB)" }}
           >
@@ -150,8 +170,11 @@ export function Navbar({ theme }) {
             </a>
           ))}
           <a
-            href="/sessions"
-            onClick={() => setMenuOpen(false)}
+            href={classModeHref}
+            onClick={() => {
+              if (classModeSessionId) setLastSessionId(classModeSessionId);
+              setMenuOpen(false);
+            }}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-white mt-2"
             style={{ backgroundColor: "var(--ca-primary, #2563EB)" }}
           >

@@ -1,6 +1,7 @@
 export const CA_SESSIONS_KEY = "cronoaula_sessions";
 export const CA_TEACHER_KEY = "cronoaula_teacher";
 export const CA_OBS_KEY = "cronoaula_observations";
+export const CA_LAST_SESSION_KEY = "cronoaula_last_session";
 
 export function makeId(prefix = "ca") {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -50,6 +51,29 @@ export function getSession(id) {
   return getSessions().find((s) => String(s.id) === String(id)) || null;
 }
 
+export function setLastSessionId(id) {
+  if (typeof window === "undefined" || !id) return;
+  localStorage.setItem(CA_LAST_SESSION_KEY, String(id));
+}
+
+export function getLastSessionId() {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(CA_LAST_SESSION_KEY) || "";
+}
+
+export function getSessionDate(session) {
+  return new Date(session?.last_modified || session?.updated_at || session?.created_at || session?.date || 0).getTime();
+}
+
+export function getMostRecentSession() {
+  return [...getSessions()].sort((a, b) => getSessionDate(b) - getSessionDate(a))[0] || null;
+}
+
+export function getLastOrRecentSession() {
+  const last = getSession(getLastSessionId());
+  return last || getMostRecentSession();
+}
+
 export function saveSession(session) {
   const now = new Date().toISOString();
   const sessions = getSessions();
@@ -73,11 +97,15 @@ export function saveSession(session) {
   const idx = sessions.findIndex((s) => String(s.id) === String(normalized.id));
   const next = idx >= 0 ? sessions.map((s, i) => (i === idx ? normalized : s)) : [normalized, ...sessions];
   writeJson(CA_SESSIONS_KEY, next);
+  setLastSessionId(normalized.id);
   return normalized;
 }
 
 export function deleteSession(id) {
   writeJson(CA_SESSIONS_KEY, getSessions().filter((s) => String(s.id) !== String(id)));
+  if (String(getLastSessionId()) === String(id) && typeof window !== "undefined") {
+    localStorage.removeItem(CA_LAST_SESSION_KEY);
+  }
 }
 
 export function duplicateSession(session) {
