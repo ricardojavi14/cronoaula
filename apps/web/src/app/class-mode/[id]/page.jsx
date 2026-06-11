@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getSession, saveSession, updateSubmomentStatus } from "@/utils/localStore";
+import { THEMES, useAppSettings } from "@/context/AppSettingsContext";
 
 const COLORS = [
   "#2563EB",
@@ -127,8 +128,68 @@ function hasLongText(text = "") {
   return String(text).length > 320 || String(text).split("\n").length > 5;
 }
 
+function getClassTheme(settings) {
+  if (settings.highContrastMode || settings.theme === "contraste") {
+    return {
+      bg: "#000000",
+      surface: "#111111",
+      soft: "#1F1F1F",
+      text: "#FFFFFF",
+      muted: "#FACC15",
+      border: "#FACC15",
+      projectorBg: "#000000",
+    };
+  }
+  if (settings.darkModeInClass || settings.theme === "oscuro") {
+    return {
+      bg: "#0F172A",
+      surface: "#111827",
+      soft: "#1E293B",
+      text: "#F8FAFC",
+      muted: "#CBD5E1",
+      border: "#334155",
+      projectorBg: "#020617",
+    };
+  }
+  if (settings.theme === "calido") {
+    return {
+      bg: "#FFF7ED",
+      surface: "#FFFFFF",
+      soft: "#FFEDD5",
+      text: "#3D2B1F",
+      muted: "#9A3412",
+      border: "#FED7AA",
+      projectorBg: "#431407",
+    };
+  }
+  const theme = THEMES[settings.theme] || THEMES.claro;
+  return {
+    bg: theme.bg || "#F1F5F9",
+    surface: theme.surface || "#FFFFFF",
+    soft: "#EFF6FF",
+    text: theme.text || "#0F172A",
+    muted: theme.textMuted || "#64748B",
+    border: theme.border || "#E2E8F0",
+    projectorBg: "#0F172A",
+  };
+}
+
+function getFontSize(settings) {
+  if (settings.fontSize === "gigante") return "20px";
+  if (settings.fontSize === "grande") return "17px";
+  return "15px";
+}
+
+function getTimerScale(settings) {
+  return settings.timerSize === "gigante" ? "gigante" : "grande";
+}
+
 export default function ClassModePage({ params }) {
   const { id } = params;
+  const { settings } = useAppSettings();
+  const primaryColor = settings.primaryColor || "#2563EB";
+  const visualTheme = getClassTheme(settings);
+  const timerScale = getTimerScale(settings);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
@@ -138,9 +199,11 @@ export default function ClassModePage({ params }) {
   const [currentSubIdx, setCurrentSubIdx] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
-  const [viewMode, setViewMode] = useState("teacher");
+  const [viewMode, setViewMode] = useState(
+    settings.defaultClassView === "class" ? "class" : "teacher",
+  );
   const [projectorMode, setProjectorMode] = useState(false);
-  const [focusMode, setFocusMode] = useState(false);
+  const [focusMode, setFocusMode] = useState(Boolean(settings.distractionFree));
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [showLateStart, setShowLateStart] = useState(false);
   const [lateMode, setLateMode] = useState("delay");
@@ -227,6 +290,18 @@ export default function ClassModePage({ params }) {
         : timeLeft <= 300
           ? "soft"
           : "normal";
+  const shellStyle = {
+    "--class-primary": primaryColor,
+    "--class-bg": visualTheme.bg,
+    "--class-surface": visualTheme.surface,
+    "--class-soft": visualTheme.soft,
+    "--class-text": visualTheme.text,
+    "--class-muted": visualTheme.muted,
+    "--class-border": visualTheme.border,
+    backgroundColor: visualTheme.bg,
+    color: visualTheme.text,
+    fontSize: getFontSize(settings),
+  };
 
   useEffect(() => {
     if (!isActive || showSummary) return;
@@ -246,6 +321,14 @@ export default function ClassModePage({ params }) {
   useEffect(() => {
     setActivityExpanded(false);
   }, [currentMomentIdx, currentSubIdx]);
+
+  useEffect(() => {
+    setViewMode(settings.defaultClassView === "class" ? "class" : "teacher");
+  }, [settings.defaultClassView]);
+
+  useEffect(() => {
+    setFocusMode(Boolean(settings.distractionFree));
+  }, [settings.distractionFree]);
 
   const saveCurrentStatus = useCallback(
     (status) => {
@@ -373,12 +456,15 @@ export default function ClassModePage({ params }) {
   }
 
   const shellClass = projectorMode
-    ? "fixed inset-0 z-[100] bg-slate-950 text-white overflow-hidden"
-    : "fixed inset-0 z-[100] bg-slate-100 text-slate-900 overflow-hidden";
+    ? "fixed inset-0 z-[100] text-white overflow-hidden"
+    : "fixed inset-0 z-[100] overflow-hidden";
 
   if (projectorMode) {
     return (
-      <div className={shellClass}>
+      <div
+        className={shellClass}
+        style={{ ...shellStyle, backgroundColor: visualTheme.projectorBg }}
+      >
         <div className="h-full flex flex-col items-center justify-center px-8 py-10 text-center">
           <div className="absolute top-5 left-5 right-5 flex items-center justify-between">
             <button
@@ -419,11 +505,11 @@ export default function ClassModePage({ params }) {
                     : alertState === "done"
                       ? "text-emerald-300"
                       : "text-white"
-              } text-[120px] md:text-[190px]`}
+              } ${timerScale === "gigante" ? "text-[140px] md:text-[220px]" : "text-[120px] md:text-[190px]"}`}
             >
               {formatClock(timeLeft)}
             </div>
-            <ProgressBar value={currentProgress} color={momentColor} dark />
+            <ProgressBar value={currentProgress} color={primaryColor || momentColor} dark />
           </div>
 
           <div className="absolute bottom-8 flex flex-wrap justify-center gap-4">
@@ -443,15 +529,21 @@ export default function ClassModePage({ params }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-100 overflow-hidden">
-      <header className="h-16 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between shadow-sm">
+    <div className="fixed inset-0 z-[100] overflow-hidden" style={shellStyle}>
+      <header
+        className="h-16 px-4 md:px-6 flex items-center justify-between shadow-sm"
+        style={{
+          backgroundColor: visualTheme.surface,
+          borderBottom: `1px solid ${visualTheme.border}`,
+        }}
+      >
         <div className="flex items-center gap-3 min-w-0">
           <a href="/sessions" className="p-2 rounded-xl hover:bg-slate-100 text-slate-500">
             <ArrowLeft size={20} />
           </a>
           <div className="min-w-0">
-            <h1 className="font-black text-slate-900 truncate">{session.title}</h1>
-            <p className="text-xs text-slate-500 truncate">
+            <h1 className="font-black truncate" style={{ color: visualTheme.text }}>{session.title}</h1>
+            <p className="text-xs truncate" style={{ color: visualTheme.muted }}>
               {session.area || "Area sin registrar"} · {session.grade || "Grado sin registrar"}
             </p>
           </div>
@@ -500,6 +592,8 @@ export default function ClassModePage({ params }) {
             nextSub={nextSub}
             nextMomentLabel={nextMomentLabel}
             isLastActivity={isLastActivity}
+            primaryColor={primaryColor}
+            timerScale={timerScale}
           />
         ) : (
           <ClassView
@@ -527,6 +621,8 @@ export default function ClassModePage({ params }) {
             nextMomentLabel={nextMomentLabel}
             isLastActivity={isLastActivity}
             focusMode={focusMode}
+            primaryColor={primaryColor}
+            timerScale={timerScale}
           />
         )}
       </main>
@@ -599,6 +695,8 @@ function TeacherView({
   nextSub,
   nextMomentLabel,
   isLastActivity,
+  primaryColor,
+  timerScale,
 }) {
   return (
     <div className={`grid gap-4 p-4 md:p-5 ${focusMode ? "max-w-5xl mx-auto" : "xl:grid-cols-[1fr_320px] max-w-7xl mx-auto"}`}>
@@ -606,7 +704,7 @@ function TeacherView({
         <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-4 md:p-5 space-y-4">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
             <div className="space-y-2">
-              <p className="text-xs font-black text-blue-600 uppercase tracking-wide">
+              <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--class-primary)" }}>
                 Vista docente
               </p>
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-white text-xs font-black" style={{ backgroundColor: momentColor }}>
@@ -636,6 +734,7 @@ function TeacherView({
               totalSessionLeft={totalSessionLeft}
               alertState={alertState}
               compact
+              timerScale={timerScale}
             />
           </div>
 
@@ -650,7 +749,7 @@ function TeacherView({
             <ProgressHeader label="Progreso del momento" value={currentProgress} />
             <ProgressBar value={currentProgress} color={momentColor} />
             <ProgressHeader label="Progreso general de la sesion" value={generalProgress} />
-            <ProgressBar value={generalProgress} color="#2563EB" />
+            <ProgressBar value={generalProgress} color={primaryColor} />
           </div>
 
           <ControlRow
@@ -710,14 +809,21 @@ function ClassView({
   nextMomentLabel,
   isLastActivity,
   focusMode,
+  primaryColor,
+  timerScale,
 }) {
   return (
-    <div className="min-h-full bg-gradient-to-br from-blue-50 via-white to-emerald-50">
+    <div
+      className="min-h-full"
+      style={{
+        background: `linear-gradient(135deg, var(--class-bg), var(--class-soft))`,
+      }}
+    >
       <div className={`p-4 md:p-6 ${focusMode ? "max-w-5xl" : "max-w-6xl"} mx-auto`}>
         <section className="rounded-[28px] bg-white/90 border border-white shadow-xl p-5 md:p-8 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <p className="text-xs font-black text-blue-600 uppercase tracking-wide">
+              <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--class-primary)" }}>
                 Vista de clase
               </p>
               <h2 className="text-4xl md:text-6xl font-black text-slate-900 leading-tight mt-2">
@@ -732,7 +838,7 @@ function ClassView({
 
           <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-stretch">
             <div className="rounded-3xl border border-blue-100 bg-blue-50/70 p-5 md:p-7 space-y-4">
-              <p className="text-xs font-black text-blue-700 uppercase tracking-wide">
+              <p className="text-xs font-black uppercase tracking-wide" style={{ color: "var(--class-primary)" }}>
                 Actividad de aprendizaje
               </p>
               <h3 className="text-xl md:text-2xl font-black text-slate-900">
@@ -756,6 +862,7 @@ function ClassView({
               totalSessionLeft={totalSessionLeft}
               alertState={alertState}
               large
+              timerScale={timerScale}
             />
           </div>
 
@@ -765,7 +872,7 @@ function ClassView({
               <span>Progreso del momento</span>
               <span>{Math.round(currentProgress)}%</span>
             </div>
-            <ProgressBar value={generalProgress} color="#2563EB" />
+            <ProgressBar value={generalProgress} color={primaryColor} />
             <div className="flex items-center justify-between text-xs font-bold text-slate-500">
               <span>Progreso de la sesion</span>
               <span>{Math.round(generalProgress)}%</span>
@@ -832,7 +939,15 @@ function ActivityCard({
   );
 }
 
-function TimerCard({ timeLeft, totalSessionLeft, alertState, compact, large }) {
+function TimerCard({ timeLeft, totalSessionLeft, alertState, compact, large, timerScale = "grande" }) {
+  const timerClass =
+    timerScale === "gigante"
+      ? large
+        ? "text-[116px] md:text-[178px]"
+        : "text-[96px] md:text-[136px]"
+      : large
+        ? "text-[96px] md:text-[150px]"
+        : "text-[82px] md:text-[116px]";
   return (
     <div className={`rounded-3xl bg-slate-950 text-white ${compact ? "p-5" : "p-6"} flex flex-col items-center justify-center min-h-[220px]`}>
       <p className="text-white/60 text-sm font-bold uppercase tracking-wide mb-2">
@@ -840,7 +955,7 @@ function TimerCard({ timeLeft, totalSessionLeft, alertState, compact, large }) {
       </p>
       <div
         className={`font-mono font-black leading-none tracking-tight ${
-          large ? "text-[96px] md:text-[150px]" : "text-[82px] md:text-[116px]"
+          timerClass
         } ${
           alertState === "critical"
             ? "text-red-300"
@@ -990,7 +1105,7 @@ function InfoCard({ label, value, icon, compact = false }) {
 
 function ClassButton({ onClick, icon, label, primary, danger, dark, className = "" }) {
   const cls = primary
-    ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+    ? "text-white"
     : danger
       ? "bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
       : dark
@@ -1000,6 +1115,14 @@ function ClassButton({ onClick, icon, label, primary, danger, dark, className = 
     <button
       onClick={onClick}
       className={`min-h-14 px-4 py-3 rounded-2xl border flex items-center justify-center gap-2 text-sm md:text-base font-black shadow-sm active:scale-[0.99] transition ${cls} ${className}`}
+      style={
+        primary
+          ? {
+              backgroundColor: "var(--class-primary)",
+              borderColor: "var(--class-primary)",
+            }
+          : undefined
+      }
     >
       {icon}
       {label}
@@ -1013,9 +1136,17 @@ function ModeToggle({ active, onClick, icon, label }) {
       onClick={onClick}
       className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold ${
         active
-          ? "bg-slate-900 text-white border-slate-900"
+          ? "text-white"
           : "bg-white hover:bg-slate-50 text-slate-600 border-slate-200"
       }`}
+      style={
+        active
+          ? {
+              backgroundColor: "var(--class-primary)",
+              borderColor: "var(--class-primary)",
+            }
+          : undefined
+      }
     >
       {icon}
       <span className="hidden md:inline">{label}</span>
@@ -1074,13 +1205,29 @@ function LateStartModal({
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setLateMode("delay")}
-            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "delay" ? "bg-blue-600 text-white border-blue-600" : "border-slate-200 text-slate-600"}`}
+            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "delay" ? "text-white" : "border-slate-200 text-slate-600"}`}
+            style={
+              lateMode === "delay"
+                ? {
+                    backgroundColor: "var(--class-primary)",
+                    borderColor: "var(--class-primary)",
+                  }
+                : undefined
+            }
           >
             Retraso
           </button>
           <button
             onClick={() => setLateMode("remaining")}
-            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "remaining" ? "bg-blue-600 text-white border-blue-600" : "border-slate-200 text-slate-600"}`}
+            className={`py-2.5 rounded-xl border text-sm font-bold ${lateMode === "remaining" ? "text-white" : "border-slate-200 text-slate-600"}`}
+            style={
+              lateMode === "remaining"
+                ? {
+                    backgroundColor: "var(--class-primary)",
+                    borderColor: "var(--class-primary)",
+                  }
+                : undefined
+            }
           >
             Tiempo real restante
           </button>
@@ -1094,7 +1241,11 @@ function LateStartModal({
           <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold">
             Cancelar
           </button>
-          <button onClick={onApply} className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-black hover:bg-blue-700">
+          <button
+            onClick={onApply}
+            className="flex-1 py-3 rounded-xl text-white font-black hover:brightness-95"
+            style={{ backgroundColor: "var(--class-primary)" }}
+          >
             Aplicar ajuste
           </button>
         </div>
@@ -1142,7 +1293,11 @@ function SummaryModal({ session, plannedSeconds, workedSeconds, completedCount, 
           <button onClick={onRepeat} className="py-3 rounded-xl border border-blue-200 text-blue-700 font-bold hover:bg-blue-50 flex items-center justify-center gap-2">
             <RotateCcw size={16} /> Repetir
           </button>
-          <a href={`/create?id=${session.id}`} className="py-3 rounded-xl bg-blue-600 text-white font-black text-center hover:bg-blue-700">
+          <a
+            href={`/create?id=${session.id}`}
+            className="py-3 rounded-xl text-white font-black text-center hover:brightness-95"
+            style={{ backgroundColor: "var(--class-primary)" }}
+          >
             Editar sesion
           </a>
         </div>

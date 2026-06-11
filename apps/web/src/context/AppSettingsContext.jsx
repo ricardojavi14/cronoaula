@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS = {
 
   // Modo clase
   timerSize: "grande", // grande | gigante | proyector
+  defaultClassView: "teacher", // teacher | class
   showCurrentMoment: true,
   showNextMoment: true,
   showProgressBar: true,
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS = {
   showTotalTimeLeft: true,
   showMomentTimeLeft: true,
   darkModeInClass: false,
+  highContrastMode: false,
   distractionFree: false,
   soundAlerts: true,
   alertSound: "beep", // beep | bell | chime | soft
@@ -39,10 +41,14 @@ export const DEFAULT_SETTINGS = {
   alertAt30sec: false,
 
   // Preferencias docentes
+  teacherName: "",
+  institution: "",
   defaultGrade: "",
   defaultLevel: "Primaria",
+  defaultArea: "Comunicacion",
   favoriteAreas: ["Comunicación", "Matemática"],
   defaultDuration: 90,
+  classroomContext: "",
   favoriteMoments: ["Inicio", "Desarrollo", "Cierre"],
   defaultCreationMode: "simple", // simple | advanced | import
 

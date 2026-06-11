@@ -1,1421 +1,564 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Palette,
-  Monitor,
-  User,
-  Download,
-  Image,
-  Database,
-  ChevronRight,
+  ArrowLeft,
   Check,
+  Monitor,
+  Palette,
   RotateCcw,
   Save,
-  ArrowLeft,
-  Sun,
-  Moon,
-  Minus,
-  Settings,
-  Layout,
-  Square,
-  Zap,
-  Bell,
-  Volume2,
-  VolumeX,
-  BookOpen,
-  Clock,
-  Eye,
-  EyeOff,
-  Timer,
-  Layers,
-  AlertTriangle,
-  HardDrive,
-  Upload,
-  Trash2,
-  RefreshCw,
-  Info,
   Shield,
-  Play,
-  Wand2,
-  Star,
-  Heart,
-  Type,
+  Sparkles,
+  Timer,
+  User,
 } from "lucide-react";
-import {
-  useAppSettings,
-  THEMES,
-  FONT_SIZES,
-  DEFAULT_SETTINGS,
-} from "@/context/AppSettingsContext";
 import { toast } from "sonner";
+import {
+  DEFAULT_SETTINGS,
+  THEMES,
+  useAppSettings,
+} from "@/context/AppSettingsContext";
+import { getTeacher, saveTeacher } from "@/utils/localStore";
 
-const TABS = [
-  { id: "apariencia", label: "Apariencia", icon: <Palette size={16} /> },
-  { id: "clase", label: "Modo clase", icon: <Monitor size={16} /> },
-  { id: "docente", label: "Docente", icon: <User size={16} /> },
-  { id: "importacion", label: "Importación", icon: <Download size={16} /> },
-  { id: "fondos", label: "Fondos", icon: <Image size={16} /> },
-  { id: "datos", label: "Datos", icon: <Database size={16} /> },
+const THEME_OPTIONS = [
+  { value: "claro", label: "Claro" },
+  { value: "oscuro", label: "Oscuro" },
+  { value: "calido", label: "Aula cálida" },
+  { value: "contraste", label: "Alto contraste" },
 ];
 
-const AREAS = [
-  "Comunicación",
-  "Matemática",
-  "Personal Social",
-  "Ciencia y Tecnología",
-  "Arte y Cultura",
-  "Educación Física",
-  "Tutoría",
-  "Educación Religiosa",
-  "Plan Lector",
+const FONT_OPTIONS = [
+  { value: "normal", label: "Normal" },
+  { value: "grande", label: "Grande" },
+  { value: "gigante", label: "Gigante" },
 ];
-const ALL_MOMENTS = [
-  "Actividad permanente",
-  "Inicio",
-  "Desarrollo",
-  "Cierre",
-  "Pausa activa",
-  "Metacognición",
-  "Evaluación",
-  "Retroalimentación",
-  "Lavado de manos",
-  "Transferencia",
+
+const TIMER_OPTIONS = [
+  { value: "grande", label: "Grande" },
+  { value: "gigante", label: "Gigante" },
 ];
-const LEVELS = ["Inicial", "Primaria", "Secundaria", "Superior"];
 
-// ─── Reusable sub-components ─────────────────────────────────────────────────
+const DENSITY_OPTIONS = [
+  { value: "compacta", label: "Compacta" },
+  { value: "normal", label: "Normal" },
+  { value: "amplia", label: "Amplia" },
+];
 
-function Section({ title, desc, children }) {
+const VIEW_OPTIONS = [
+  { value: "teacher", label: "Vista docente" },
+  { value: "class", label: "Vista de clase" },
+];
+
+const COLOR_OPTIONS = [
+  "#2563EB",
+  "#0F766E",
+  "#7C3AED",
+  "#D97706",
+  "#DC2626",
+  "#0891B2",
+  "#BE185D",
+  "#111827",
+];
+
+function buildTeacherState(settings) {
+  const teacher = getTeacher();
+  return {
+    name: settings.teacherName || teacher.name || "",
+    institution: settings.institution || teacher.institution || teacher.school || "",
+    defaultGrade: settings.defaultGrade || teacher.defaultGrade || teacher.grade || "",
+    defaultArea: settings.defaultArea || teacher.defaultArea || "Comunicacion",
+    defaultDuration: settings.defaultDuration || teacher.defaultDuration || 90,
+    classroomContext:
+      settings.classroomContext || teacher.classroomContext || "",
+  };
+}
+
+function Field({ label, children, hint }) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="font-bold text-base" style={{ color: "var(--ca-text)" }}>
-          {title}
-        </h3>
-        {desc && (
-          <p
-            className="text-xs mt-0.5"
-            style={{ color: "var(--ca-text-muted)" }}
-          >
-            {desc}
-          </p>
-        )}
-      </div>
-      <div className="space-y-3">{children}</div>
-    </div>
+    <label className="block space-y-2">
+      <span className="text-sm font-bold text-slate-800">{label}</span>
+      {children}
+      {hint && <span className="block text-xs text-slate-500">{hint}</span>}
+    </label>
   );
 }
 
-function SettingRow({ label, desc, children, tight }) {
+function TextInput(props) {
   return (
-    <div
-      className={`flex items-center justify-between gap-4 py-3 border-b`}
-      style={{ borderColor: "var(--ca-border)" }}
-    >
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium" style={{ color: "var(--ca-text)" }}>
-          {label}
-        </p>
-        {desc && (
-          <p
-            className="text-xs mt-0.5"
-            style={{ color: "var(--ca-text-muted)" }}
-          >
-            {desc}
-          </p>
-        )}
-      </div>
-      <div
-        className={`shrink-0 ${tight ? "" : "min-w-[160px]"} flex justify-end`}
-      >
-        {children}
-      </div>
-    </div>
+    <input
+      {...props}
+      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+    />
   );
 }
 
-function Toggle({ value, onChange }) {
+function TextArea(props) {
   return (
-    <button
-      onClick={() => onChange(!value)}
-      className="relative w-11 h-6 rounded-full transition-all duration-200 focus:outline-none"
-      style={{
-        backgroundColor: value
-          ? "var(--ca-primary, #2563EB)"
-          : "var(--ca-border)",
-      }}
-    >
-      <span
-        className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
-        style={{ transform: value ? "translateX(20px)" : "translateX(0)" }}
-      />
-    </button>
+    <textarea
+      {...props}
+      className="min-h-28 w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+    />
   );
 }
 
-function Chip({ label, active, onClick, color }) {
-  return (
-    <button
-      onClick={onClick}
-      className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
-      style={{
-        backgroundColor: active
-          ? color || "var(--ca-primary)"
-          : "var(--ca-surface)",
-        color: active ? "#fff" : "var(--ca-text-muted)",
-        borderColor: active ? color || "var(--ca-primary)" : "var(--ca-border)",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-function Select({ value, onChange, options }) {
+function SelectField({ value, onChange, options }) {
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="px-3 py-2 text-sm rounded-xl border outline-none focus:ring-2 min-w-[140px]"
-      style={{
-        backgroundColor: "var(--ca-surface)",
-        color: "var(--ca-text)",
-        borderColor: "var(--ca-border)",
-      }}
+      onChange={(event) => onChange(event.target.value)}
+      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
     >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
         </option>
       ))}
     </select>
   );
 }
 
-function NumberStepper({ value, onChange, min = 0, max = 120, step = 1 }) {
+function Toggle({ checked, onChange, label, hint }) {
   return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={() => onChange(Math.max(min, value - step))}
-        className="w-8 h-8 rounded-lg border flex items-center justify-center text-lg font-bold hover:bg-black/5"
-        style={{ borderColor: "var(--ca-border)", color: "var(--ca-text)" }}
-      >
-        −
-      </button>
-      <span
-        className="w-12 text-center font-mono font-bold text-sm"
-        style={{ color: "var(--ca-text)" }}
-      >
-        {value}
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-slate-300"
+    >
+      <span>
+        <span className="block text-sm font-bold text-slate-800">{label}</span>
+        {hint && <span className="block text-xs text-slate-500">{hint}</span>}
       </span>
-      <button
-        onClick={() => onChange(Math.min(max, value + step))}
-        className="w-8 h-8 rounded-lg border flex items-center justify-center text-lg font-bold hover:bg-black/5"
-        style={{ borderColor: "var(--ca-border)", color: "var(--ca-text)" }}
+      <span
+        className="relative h-7 w-12 rounded-full transition"
+        style={{ backgroundColor: checked ? "var(--settings-primary)" : "#CBD5E1" }}
       >
-        +
-      </button>
-    </div>
-  );
-}
-
-function SliderSetting({
-  label,
-  desc,
-  value,
-  onChange,
-  min = 0,
-  max = 1,
-  step = 0.05,
-  format,
-}) {
-  const display = format ? format(value) : Math.round(value * 100) + "%";
-  return (
-    <SettingRow label={label} desc={desc}>
-      <div className="flex items-center gap-3">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="w-24 accent-blue-600"
-        />
         <span
-          className="text-xs font-mono w-10 text-right"
-          style={{ color: "var(--ca-text-muted)" }}
-        >
-          {display}
-        </span>
-      </div>
-    </SettingRow>
-  );
-}
-
-function ColorPicker({ value, onChange, label }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div
-        className="relative w-9 h-9 rounded-xl border overflow-hidden cursor-pointer"
-        style={{ borderColor: "var(--ca-border)" }}
-      >
-        <div
-          className="absolute inset-0 rounded-xl"
-          style={{ backgroundColor: value }}
+          className="absolute top-1 h-5 w-5 rounded-full bg-white shadow transition"
+          style={{ left: checked ? "24px" : "4px" }}
         />
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-        />
-      </div>
-      <span
-        className="text-xs font-mono"
-        style={{ color: "var(--ca-text-muted)" }}
-      >
-        {value}
       </span>
-    </div>
+    </button>
   );
 }
 
-function MultiChip({ value = [], options, onChange }) {
-  const toggle = (opt) => {
-    const next = value.includes(opt)
-      ? value.filter((x) => x !== opt)
-      : [...value, opt];
-    onChange(next);
-  };
+function Card({ icon, title, subtitle, children }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((opt) => (
-        <Chip
-          key={opt}
-          label={opt}
-          active={value.includes(opt)}
-          onClick={() => toggle(opt)}
-        />
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+      <div className="mb-5 flex items-start gap-3">
+        <div className="rounded-2xl bg-blue-50 p-3 text-blue-700">{icon}</div>
+        <div>
+          <h2 className="text-lg font-black text-slate-950">{title}</h2>
+          {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Segmented({ value, onChange, options }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-3">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className="rounded-2xl border px-4 py-3 text-sm font-black transition"
+          style={{
+            backgroundColor:
+              value === option.value ? "var(--settings-primary)" : "#FFFFFF",
+            borderColor:
+              value === option.value ? "var(--settings-primary)" : "#E2E8F0",
+            color: value === option.value ? "#FFFFFF" : "#334155",
+          }}
+        >
+          {option.label}
+        </button>
       ))}
     </div>
   );
 }
 
-// ─── Main settings page ───────────────────────────────────────────────────────
 export default function SettingsPage() {
-  const { settings, setSetting, setSettings, resetSettings } = useAppSettings();
-  const [activeTab, setActiveTab] = useState("apariencia");
-  const [saved, setSaved] = useState(false);
+  const { settings, setSettings, resetSettings } = useAppSettings();
+  const [teacher, setTeacher] = useState(() => buildTeacherState(settings));
+  const theme = THEMES[settings.theme] || THEMES.claro;
+  const previewStyle = useMemo(
+    () => ({
+      backgroundColor: settings.highContrastMode ? "#000000" : theme.bg,
+      color: settings.highContrastMode ? "#FFFFFF" : theme.text,
+      borderColor: settings.highContrastMode ? "#FACC15" : theme.border,
+    }),
+    [settings.highContrastMode, theme],
+  );
 
-  const s = (key, val) => {
-    setSetting(key, val);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+  useEffect(() => {
+    setTeacher(buildTeacherState(settings));
+  }, [settings.teacherName, settings.institution, settings.defaultGrade, settings.defaultArea, settings.defaultDuration, settings.classroomContext]);
+
+  const updateSetting = (key, value) => {
+    setSettings({ [key]: value });
+  };
+
+  const updateTeacher = (key, value) => {
+    setTeacher((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = () => {
+    try {
+      const teacherPayload = {
+        id: "local-teacher",
+        name: teacher.name,
+        institution: teacher.institution,
+        school: teacher.institution,
+        grade: teacher.defaultGrade,
+        defaultGrade: teacher.defaultGrade,
+        defaultArea: teacher.defaultArea,
+        defaultDuration: Number(teacher.defaultDuration) || 90,
+        classroomContext: teacher.classroomContext,
+      };
+      saveTeacher(teacherPayload);
+      setSettings({
+        teacherName: teacher.name,
+        institution: teacher.institution,
+        defaultGrade: teacher.defaultGrade,
+        defaultArea: teacher.defaultArea,
+        defaultDuration: Number(teacher.defaultDuration) || 90,
+        classroomContext: teacher.classroomContext,
+      });
+      toast.success("Configuración guardada");
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo guardar la configuración en este navegador");
+    }
   };
 
   const handleReset = () => {
-    if (
-      !confirm(
-        "¿Restaurar toda la configuración a los valores predeterminados?",
-      )
-    )
-      return;
-    resetSettings();
-    toast.success("Configuración restaurada");
-  };
-
-  const surfaceStyle = {
-    backgroundColor: "var(--ca-surface)",
-    borderColor: "var(--ca-border)",
-    color: "var(--ca-text)",
+    if (!confirm("¿Restaurar la configuración inicial de CronoAula?")) return;
+    try {
+      resetSettings();
+      const nextTeacher = {
+        name: DEFAULT_SETTINGS.teacherName,
+        institution: DEFAULT_SETTINGS.institution,
+        defaultGrade: DEFAULT_SETTINGS.defaultGrade,
+        defaultArea: DEFAULT_SETTINGS.defaultArea,
+        defaultDuration: DEFAULT_SETTINGS.defaultDuration,
+        classroomContext: DEFAULT_SETTINGS.classroomContext,
+      };
+      setTeacher(nextTeacher);
+      saveTeacher({
+        id: "local-teacher",
+        name: nextTeacher.name,
+        institution: nextTeacher.institution,
+        school: nextTeacher.institution,
+        grade: nextTeacher.defaultGrade,
+        defaultGrade: nextTeacher.defaultGrade,
+        defaultArea: nextTeacher.defaultArea,
+        defaultDuration: nextTeacher.defaultDuration,
+        classroomContext: nextTeacher.classroomContext,
+      });
+      toast.success("Configuración inicial restaurada");
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo restaurar la configuración");
+    }
   };
 
   return (
-    <div className="max-w-5xl mx-auto pb-20">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <a
-            href="/"
-            className="p-2 rounded-xl hover:bg-black/5 transition-colors"
-            style={{ color: "var(--ca-text-muted)" }}
-          >
-            <ArrowLeft size={18} />
-          </a>
-          <div>
-            <h1
-              className="text-2xl font-bold"
-              style={{ color: "var(--ca-text)" }}
+    <div
+      className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-6 md:px-8"
+      style={{ "--settings-primary": settings.primaryColor || "#2563EB" }}
+    >
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <a
+              href="/"
+              className="rounded-2xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+              aria-label="Volver"
             >
-              Configuración de CronoAula
-            </h1>
-            <p className="text-sm" style={{ color: "var(--ca-text-muted)" }}>
-              Personaliza toda tu experiencia docente
-            </p>
+              <ArrowLeft size={20} />
+            </a>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wide text-blue-700">
+                Configuración
+              </p>
+              <h1 className="text-2xl font-black text-slate-950 md:text-3xl">
+                Personaliza CronoAula
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                Tus datos y preferencias se guardan en este navegador. No se
+                envían a un servidor.
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {saved && (
-            <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg">
-              <Check size={14} /> Guardado
-            </span>
-          )}
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium hover:bg-black/5 transition-colors"
-            style={{
-              borderColor: "var(--ca-border)",
-              color: "var(--ca-text-muted)",
-            }}
-          >
-            <RotateCcw size={14} /> Restaurar
-          </button>
-        </div>
-      </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+            >
+              <RotateCcw size={16} /> Restaurar configuración inicial
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-sm transition hover:brightness-95"
+              style={{ backgroundColor: "var(--settings-primary)" }}
+            >
+              <Save size={16} /> Guardar
+            </button>
+          </div>
+        </header>
 
-      <div className="flex flex-col md:flex-row gap-5">
-        {/* Sidebar */}
-        <div className="md:w-52 shrink-0">
-          <div
-            className="rounded-2xl border p-2 space-y-0.5 sticky top-20"
-            style={{ ...surfaceStyle }}
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <Card
+            icon={<User size={22} />}
+            title="Datos del docente"
+            subtitle="Estos datos ayudan a preparar sesiones más consistentes."
           >
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left"
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Nombre del docente">
+                <TextInput
+                  value={teacher.name}
+                  onChange={(event) => updateTeacher("name", event.target.value)}
+                  placeholder="Ej. Ricardo Pérez"
+                />
+              </Field>
+              <Field label="Institución educativa">
+                <TextInput
+                  value={teacher.institution}
+                  onChange={(event) =>
+                    updateTeacher("institution", event.target.value)
+                  }
+                  placeholder="Ej. I.E. Nuestra Señora..."
+                />
+              </Field>
+              <Field label="Grado predeterminado">
+                <TextInput
+                  value={teacher.defaultGrade}
+                  onChange={(event) =>
+                    updateTeacher("defaultGrade", event.target.value)
+                  }
+                  placeholder="Ej. 5to de primaria"
+                />
+              </Field>
+              <Field label="Área predeterminada">
+                <TextInput
+                  value={teacher.defaultArea}
+                  onChange={(event) =>
+                    updateTeacher("defaultArea", event.target.value)
+                  }
+                  placeholder="Ej. Comunicación"
+                />
+              </Field>
+              <Field label="Duración predeterminada" hint="En minutos.">
+                <TextInput
+                  type="number"
+                  min="1"
+                  value={teacher.defaultDuration}
+                  onChange={(event) =>
+                    updateTeacher("defaultDuration", event.target.value)
+                  }
+                />
+              </Field>
+              <div className="md:col-span-2">
+                <Field label="Contexto o nota del aula">
+                  <TextArea
+                    value={teacher.classroomContext}
+                    onChange={(event) =>
+                      updateTeacher("classroomContext", event.target.value)
+                    }
+                    placeholder="Ej. Grupo participativo, algunos estudiantes requieren apoyo lector..."
+                  />
+                </Field>
+              </div>
+            </div>
+          </Card>
+
+          <Card
+            icon={<Palette size={22} />}
+            title="Configuración visual"
+            subtitle="Ajusta cómo se ve CronoAula durante la planificación y la clase."
+          >
+            <div className="space-y-5">
+              <Field label="Tema visual">
+                <Segmented
+                  value={settings.theme}
+                  onChange={(value) => updateSetting("theme", value)}
+                  options={THEME_OPTIONS}
+                />
+              </Field>
+
+              <Field label="Color principal">
+                <div className="flex flex-wrap items-center gap-2">
+                  {COLOR_OPTIONS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => updateSetting("primaryColor", color)}
+                      className="h-10 w-10 rounded-2xl border-2 shadow-sm transition hover:scale-105"
+                      style={{
+                        backgroundColor: color,
+                        borderColor:
+                          settings.primaryColor === color ? "#0F172A" : "#FFFFFF",
+                      }}
+                      aria-label={`Usar color ${color}`}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={settings.primaryColor || "#2563EB"}
+                    onChange={(event) =>
+                      updateSetting("primaryColor", event.target.value)
+                    }
+                    className="h-10 w-14 rounded-xl border border-slate-200 bg-white p-1"
+                  />
+                </div>
+              </Field>
+
+              <Field label="Tamaño de letra">
+                <Segmented
+                  value={settings.fontSize}
+                  onChange={(value) => updateSetting("fontSize", value)}
+                  options={FONT_OPTIONS}
+                />
+              </Field>
+
+              <Field label="Densidad de interfaz">
+                <Segmented
+                  value={settings.density}
+                  onChange={(value) => updateSetting("density", value)}
+                  options={DENSITY_OPTIONS}
+                />
+              </Field>
+
+              <Toggle
+                checked={Boolean(settings.animations)}
+                onChange={(value) => updateSetting("animations", value)}
+                label="Animaciones suaves"
+                hint="Mantiene transiciones discretas en botones y progreso."
+              />
+              <Toggle
+                checked={Boolean(settings.highContrastMode)}
+                onChange={(value) => updateSetting("highContrastMode", value)}
+                label="Modo alto contraste"
+                hint="Refuerza contraste en pantallas de clase y proyector."
+              />
+            </div>
+          </Card>
+
+          <Card
+            icon={<Monitor size={22} />}
+            title="Modo clase"
+            subtitle="Preferencias para usar CronoAula en laptop, pantalla o proyector."
+          >
+            <div className="grid gap-5 md:grid-cols-2">
+              <Field label="Vista por defecto">
+                <Segmented
+                  value={settings.defaultClassView || "teacher"}
+                  onChange={(value) => updateSetting("defaultClassView", value)}
+                  options={VIEW_OPTIONS}
+                />
+              </Field>
+              <Field label="Tamaño del temporizador">
+                <Segmented
+                  value={settings.timerSize || "grande"}
+                  onChange={(value) => updateSetting("timerSize", value)}
+                  options={TIMER_OPTIONS}
+                />
+              </Field>
+              <Toggle
+                checked={Boolean(settings.distractionFree)}
+                onChange={(value) => updateSetting("distractionFree", value)}
+                label="Sin distracciones por defecto"
+                hint="Oculta paneles secundarios al entrar al Modo clase."
+              />
+              <Toggle
+                checked={Boolean(settings.darkModeInClass)}
+                onChange={(value) => updateSetting("darkModeInClass", value)}
+                label="Usar fondo oscuro en clase"
+                hint="Útil si proyectas en ambientes con poca luz."
+              />
+            </div>
+          </Card>
+
+          <Card
+            icon={<Sparkles size={22} />}
+            title="Vista previa"
+            subtitle="Así se sentirá la personalización en Modo clase."
+          >
+            <div
+              className="rounded-3xl border p-5"
+              style={previewStyle}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wide opacity-70">
+                    Vista de clase
+                  </p>
+                  <h3
+                    className="mt-1 font-black"
+                    style={{
+                      fontSize:
+                        settings.fontSize === "gigante"
+                          ? "32px"
+                          : settings.fontSize === "grande"
+                            ? "26px"
+                            : "22px",
+                    }}
+                  >
+                    Desarrollo
+                  </h3>
+                </div>
+                <Shield size={22} />
+              </div>
+              <div className="mt-5 rounded-2xl bg-white/80 p-4 text-slate-900">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                  Actividad de aprendizaje
+                </p>
+                <p className="mt-2 text-sm leading-relaxed">
+                  Los estudiantes trabajan una actividad guiada y comparten sus
+                  avances.
+                </p>
+              </div>
+              <div
+                className="mt-5 rounded-2xl px-4 py-4 text-center font-mono font-black text-white"
                 style={{
-                  backgroundColor:
-                    activeTab === tab.id
-                      ? "var(--ca-primary, #2563EB)"
-                      : "transparent",
-                  color: activeTab === tab.id ? "#fff" : "var(--ca-text-muted)",
+                  backgroundColor: settings.primaryColor || "#2563EB",
+                  fontSize:
+                    settings.timerSize === "gigante" ? "54px" : "42px",
                 }}
               >
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
+                12:00
+              </div>
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/50">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: "62%",
+                    backgroundColor: settings.primaryColor || "#2563EB",
+                  }}
+                />
+              </div>
+            </div>
+          </Card>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div
-            className="rounded-2xl border p-6 space-y-8"
-            style={surfaceStyle}
+          <Card
+            icon={<Timer size={22} />}
+            title="Guardado local"
+            subtitle="CronoAula funciona como app estática: todo queda en este navegador."
           >
-            {/* ─── APARIENCIA ─────────────────────────────────── */}
-            {activeTab === "apariencia" && (
-              <>
-                <Section
-                  title="Tema visual"
-                  desc="Elige el estilo que más te cómodo te resulte en el aula"
-                >
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {Object.entries(THEMES).map(([key, t]) => (
-                      <button
-                        key={key}
-                        onClick={() => s("theme", key)}
-                        className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all hover:scale-105"
-                        style={{
-                          backgroundColor: t.bg,
-                          borderColor:
-                            settings.theme === key
-                              ? "var(--ca-primary)"
-                              : t.border,
-                          boxShadow:
-                            settings.theme === key
-                              ? "0 0 0 3px var(--ca-primary)20"
-                              : "none",
-                        }}
-                      >
-                        <span className="text-2xl">{t.emoji}</span>
-                        <div
-                          className="w-full h-6 rounded-md"
-                          style={{
-                            backgroundColor: t.surface,
-                            border: `1px solid ${t.border}`,
-                          }}
-                        />
-                        <span
-                          className="text-xs font-bold"
-                          style={{ color: t.text }}
-                        >
-                          {t.label}
-                        </span>
-                        {settings.theme === key && (
-                          <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                            <Check size={10} /> Activo
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </Section>
-
-                <Section title="Colores">
-                  <SettingRow
-                    label="Color principal"
-                    desc="Color de botones, acentos y elementos activos"
-                  >
-                    <ColorPicker
-                      value={settings.primaryColor}
-                      onChange={(v) => s("primaryColor", v)}
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    label="Color secundario"
-                    desc="Color de elementos secundarios y etiquetas"
-                  >
-                    <ColorPicker
-                      value={settings.secondaryColor}
-                      onChange={(v) => s("secondaryColor", v)}
-                    />
-                  </SettingRow>
-                  <div className="flex gap-3 flex-wrap pt-1">
-                    {[
-                      "#2563EB",
-                      "#7C3AED",
-                      "#059669",
-                      "#D97706",
-                      "#DC2626",
-                      "#0891B2",
-                      "#9333EA",
-                      "#BE185D",
-                    ].map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => s("primaryColor", c)}
-                        className="w-8 h-8 rounded-xl border-2 hover:scale-110 transition-transform"
-                        style={{
-                          backgroundColor: c,
-                          borderColor:
-                            settings.primaryColor === c
-                              ? "var(--ca-text)"
-                              : "transparent",
-                        }}
-                      />
-                    ))}
-                  </div>
-                </Section>
-
-                <Section title="Tipografía y tamaño de letra">
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: "pequeño", label: "A (pequeño)", size: "12px" },
-                      { id: "normal", label: "A (normal)", size: "15px" },
-                      { id: "grande", label: "A (grande)", size: "18px" },
-                      { id: "gigante", label: "A (gigante)", size: "22px" },
-                    ].map((fs) => (
-                      <button
-                        key={fs.id}
-                        onClick={() => s("fontSize", fs.id)}
-                        className="px-4 py-2.5 rounded-xl border-2 font-semibold transition-all"
-                        style={{
-                          fontSize: fs.size,
-                          borderColor:
-                            settings.fontSize === fs.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-border)",
-                          backgroundColor:
-                            settings.fontSize === fs.id
-                              ? "var(--ca-primary)" + "15"
-                              : "transparent",
-                          color:
-                            settings.fontSize === fs.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-text-muted)",
-                        }}
-                      >
-                        {fs.label}
-                      </button>
-                    ))}
-                  </div>
-                </Section>
-
-                <Section
-                  title="Espaciado de la interfaz"
-                  desc="Cuánto espacio ocupa cada elemento en pantalla"
-                >
-                  <div className="flex gap-2">
-                    {[
-                      {
-                        id: "compacta",
-                        label: "Compacta",
-                        icon: <Minus size={14} />,
-                      },
-                      {
-                        id: "normal",
-                        label: "Normal",
-                        icon: <Layout size={14} />,
-                      },
-                      {
-                        id: "amplia",
-                        label: "Amplia",
-                        icon: <Layers size={14} />,
-                      },
-                    ].map((d) => (
-                      <button
-                        key={d.id}
-                        onClick={() => s("density", d.id)}
-                        className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-semibold transition-all"
-                        style={{
-                          borderColor:
-                            settings.density === d.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-border)",
-                          backgroundColor:
-                            settings.density === d.id
-                              ? "var(--ca-primary)" + "15"
-                              : "transparent",
-                          color:
-                            settings.density === d.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-text-muted)",
-                        }}
-                      >
-                        {d.icon} {d.label}
-                      </button>
-                    ))}
-                  </div>
-                </Section>
-
-                <Section title="Estilo de bordes">
-                  <div className="flex gap-2">
-                    {[
-                      { id: "suaves", label: "Suaves", radius: "8px" },
-                      {
-                        id: "redondeados",
-                        label: "Redondeados",
-                        radius: "16px",
-                      },
-                      { id: "rectos", label: "Rectos", radius: "0px" },
-                    ].map((b) => (
-                      <button
-                        key={b.id}
-                        onClick={() => s("borderStyle", b.id)}
-                        className="flex-1 py-3 border-2 text-xs font-semibold transition-all"
-                        style={{
-                          borderRadius: b.radius,
-                          borderColor:
-                            settings.borderStyle === b.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-border)",
-                          backgroundColor:
-                            settings.borderStyle === b.id
-                              ? "var(--ca-primary)" + "15"
-                              : "transparent",
-                          color:
-                            settings.borderStyle === b.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-text-muted)",
-                        }}
-                      >
-                        {b.label}
-                      </button>
-                    ))}
-                  </div>
-                </Section>
-
-                <Section title="Efectos y animaciones">
-                  <SettingRow
-                    label="Activar animaciones"
-                    desc="Transiciones suaves al navegar entre pantallas"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.animations}
-                      onChange={(v) => s("animations", v)}
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    label="Fondos decorativos"
-                    desc="Elementos visuales decorativos en el fondo"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.decorativeBackgrounds}
-                      onChange={(v) => s("decorativeBackgrounds", v)}
-                    />
-                  </SettingRow>
-                </Section>
-              </>
-            )}
-
-            {/* ─── MODO CLASE ──────────────────────────────────── */}
-            {activeTab === "clase" && (
-              <>
-                <Section
-                  title="Tamaño del temporizador"
-                  desc="Cuán grande se ve el cronómetro durante la clase"
-                >
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      {
-                        id: "grande",
-                        label: "Grande",
-                        sample: "12:34",
-                        size: "text-3xl",
-                      },
-                      {
-                        id: "gigante",
-                        label: "Gigante",
-                        sample: "12:34",
-                        size: "text-5xl",
-                      },
-                      {
-                        id: "proyector",
-                        label: "Proyector",
-                        sample: "12:34",
-                        size: "text-6xl",
-                      },
-                    ].map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => s("timerSize", t.id)}
-                        className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all"
-                        style={{
-                          borderColor:
-                            settings.timerSize === t.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-border)",
-                          backgroundColor:
-                            settings.timerSize === t.id
-                              ? "var(--ca-primary)" + "10"
-                              : "transparent",
-                        }}
-                      >
-                        <span
-                          className={`font-mono font-black tabular-nums ${t.size}`}
-                          style={{ color: "var(--ca-text)" }}
-                        >
-                          {t.sample}
-                        </span>
-                        <span
-                          className="text-xs font-semibold"
-                          style={{
-                            color:
-                              settings.timerSize === t.id
-                                ? "var(--ca-primary)"
-                                : "var(--ca-text-muted)",
-                          }}
-                        >
-                          {t.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </Section>
-
-                <Section
-                  title="Mostrar en pantalla"
-                  desc="Qué información aparece durante la clase"
-                >
-                  {[
-                    {
-                      key: "showCurrentMoment",
-                      label: "Momento actual",
-                      desc: "Nombre del momento en curso",
-                    },
-                    {
-                      key: "showNextMoment",
-                      label: "Próximo momento",
-                      desc: "Qué viene después",
-                    },
-                    {
-                      key: "showProgressBar",
-                      label: "Barra de progreso",
-                      desc: "Avance visual de la sesión",
-                    },
-                    {
-                      key: "showTeacherNotes",
-                      label: "Notas docentes",
-                      desc: "Tus recordatorios personales",
-                    },
-                    {
-                      key: "showTotalTimeLeft",
-                      label: "Tiempo restante de sesión",
-                      desc: "Cuánto queda de toda la clase",
-                    },
-                    {
-                      key: "showMomentTimeLeft",
-                      label: "Tiempo restante del momento",
-                      desc: "Cuánto queda de este momento",
-                    },
-                  ].map(({ key, label, desc }) => (
-                    <SettingRow key={key} label={label} desc={desc} tight>
-                      <Toggle
-                        value={settings[key]}
-                        onChange={(v) => s(key, v)}
-                      />
-                    </SettingRow>
-                  ))}
-                </Section>
-
-                <Section title="Modos especiales">
-                  <SettingRow
-                    label="Modo oscuro automático en clase"
-                    desc="Al iniciar modo clase, cambia al tema oscuro automáticamente"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.darkModeInClass}
-                      onChange={(v) => s("darkModeInClass", v)}
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    label="Modo sin distracciones"
-                    desc="Oculta elementos decorativos y fondos durante la clase"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.distractionFree}
-                      onChange={(v) => s("distractionFree", v)}
-                    />
-                  </SettingRow>
-                </Section>
-
-                <Section title="Sonidos y avisos">
-                  <SettingRow
-                    label="Activar sonidos de aviso"
-                    desc="Emite un sonido cuando el tiempo se acaba"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.soundAlerts}
-                      onChange={(v) => s("soundAlerts", v)}
-                    />
-                  </SettingRow>
-                  {settings.soundAlerts && (
-                    <SettingRow label="Tipo de sonido">
-                      <Select
-                        value={settings.alertSound}
-                        onChange={(v) => s("alertSound", v)}
-                        options={[
-                          { value: "beep", label: "Bip corto" },
-                          { value: "bell", label: "Campana" },
-                          { value: "chime", label: "Timbre suave" },
-                          { value: "soft", label: "Tono suave" },
-                        ]}
-                      />
-                    </SettingRow>
-                  )}
-                  <SettingRow
-                    label="Vibración en celular"
-                    desc="Si el dispositivo lo permite"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.vibration}
-                      onChange={(v) => s("vibration", v)}
-                    />
-                  </SettingRow>
-                </Section>
-
-                <Section
-                  title="¿Cuándo alertar?"
-                  desc="Elige en qué momentos recibirás alertas de tiempo"
-                >
-                  {[
-                    { key: "alertAt5min", label: "Cuando falten 5 minutos" },
-                    { key: "alertAt3min", label: "Cuando falten 3 minutos" },
-                    { key: "alertAt1min", label: "Cuando falte 1 minuto" },
-                    { key: "alertAt30sec", label: "Cuando falten 30 segundos" },
-                  ].map(({ key, label }) => (
-                    <SettingRow key={key} label={label} tight>
-                      <Toggle
-                        value={settings[key]}
-                        onChange={(v) => s(key, v)}
-                      />
-                    </SettingRow>
-                  ))}
-                </Section>
-              </>
-            )}
-
-            {/* ─── DOCENTE ─────────────────────────────────────── */}
-            {activeTab === "docente" && (
-              <>
-                <Section
-                  title="Datos del docente"
-                  desc="Se usan como valores predeterminados al crear sesiones"
-                >
-                  <SettingRow label="Nivel educativo predeterminado">
-                    <Select
-                      value={settings.defaultLevel}
-                      onChange={(v) => s("defaultLevel", v)}
-                      options={LEVELS.map((l) => ({ value: l, label: l }))}
-                    />
-                  </SettingRow>
-                  <SettingRow label="Grado predeterminado">
-                    <input
-                      value={settings.defaultGrade}
-                      onChange={(e) => s("defaultGrade", e.target.value)}
-                      placeholder="Ej. 3° primaria"
-                      className="px-3 py-2 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400 w-40"
-                      style={{
-                        backgroundColor: "var(--ca-bg)",
-                        borderColor: "var(--ca-border)",
-                        color: "var(--ca-text)",
-                      }}
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    label="Duración habitual de sesión"
-                    desc="En minutos"
-                  >
-                    <NumberStepper
-                      value={settings.defaultDuration}
-                      onChange={(v) => s("defaultDuration", v)}
-                      min={30}
-                      max={180}
-                      step={5}
-                    />
-                  </SettingRow>
-                </Section>
-
-                <Section
-                  title="Áreas favoritas"
-                  desc="Las que usas más seguido — aparecen primero en los menús"
-                >
-                  <MultiChip
-                    value={settings.favoriteAreas}
-                    options={AREAS}
-                    onChange={(v) => s("favoriteAreas", v)}
-                  />
-                </Section>
-
-                <Section
-                  title="Momentos favoritos"
-                  desc="Los que siempre usas en tus sesiones"
-                >
-                  <MultiChip
-                    value={settings.favoriteMoments}
-                    options={ALL_MOMENTS}
-                    onChange={(v) => s("favoriteMoments", v)}
-                  />
-                </Section>
-
-                <Section
-                  title="Modo de creación predeterminado"
-                  desc="Cómo prefieres crear tus sesiones"
-                >
-                  <div className="flex gap-2 flex-wrap">
-                    {[
-                      {
-                        id: "simple",
-                        label: "Simple",
-                        icon: <Zap size={14} />,
-                      },
-                      {
-                        id: "advanced",
-                        label: "Completo",
-                        icon: <Layers size={14} />,
-                      },
-                      {
-                        id: "import",
-                        label: "Importar con IA",
-                        icon: <Wand2 size={14} />,
-                      },
-                    ].map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => s("defaultCreationMode", m.id)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all"
-                        style={{
-                          borderColor:
-                            settings.defaultCreationMode === m.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-border)",
-                          backgroundColor:
-                            settings.defaultCreationMode === m.id
-                              ? "var(--ca-primary)" + "15"
-                              : "transparent",
-                          color:
-                            settings.defaultCreationMode === m.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-text-muted)",
-                        }}
-                      >
-                        {m.icon} {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </Section>
-              </>
-            )}
-
-            {/* ─── IMPORTACIÓN ─────────────────────────────────── */}
-            {activeTab === "importacion" && (
-              <>
-                <Section title="Tipo de importación predeterminada">
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      {
-                        id: "automatica",
-                        label: "Automática",
-                        icon: <Zap size={18} />,
-                        desc: "La IA analiza y genera todo de una vez",
-                      },
-                      {
-                        id: "asistida",
-                        label: "Asistida",
-                        icon: <Wand2 size={18} />,
-                        desc: "La app te guía paso a paso con preguntas",
-                      },
-                    ].map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => s("importMode", m.id)}
-                        className="flex flex-col items-center gap-2 p-5 rounded-2xl border-2 text-center transition-all"
-                        style={{
-                          borderColor:
-                            settings.importMode === m.id
-                              ? "var(--ca-primary)"
-                              : "var(--ca-border)",
-                          backgroundColor:
-                            settings.importMode === m.id
-                              ? "var(--ca-primary)" + "10"
-                              : "transparent",
-                        }}
-                      >
-                        <span
-                          style={{
-                            color:
-                              settings.importMode === m.id
-                                ? "var(--ca-primary)"
-                                : "var(--ca-text-muted)",
-                          }}
-                        >
-                          {m.icon}
-                        </span>
-                        <span
-                          className="font-bold text-sm"
-                          style={{ color: "var(--ca-text)" }}
-                        >
-                          {m.label}
-                        </span>
-                        <span
-                          className="text-xs"
-                          style={{ color: "var(--ca-text-muted)" }}
-                        >
-                          {m.desc}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </Section>
-
-                <Section title="Comportamiento de la importación">
-                  <SettingRow
-                    label="Mostrar vista previa antes de guardar"
-                    desc="Revisar y editar lo que detectó la IA antes de crear la sesión"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.alwaysShowPreview}
-                      onChange={(v) => s("alwaysShowPreview", v)}
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    label="Detectar momentos y submomentos"
-                    desc="Identificar la estructura pedagógica del texto"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.detectMoments}
-                      onChange={(v) => s("detectMoments", v)}
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    label="Sugerir tiempos automáticamente"
-                    desc="Si el texto no tiene duraciones, la IA las sugiere"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.suggestTimes}
-                      onChange={(v) => s("suggestTimes", v)}
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    label="Advertir cuando la detección es incierta"
-                    desc="La app te avisa cuando no está segura de algo que detectó"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.showUncertainWarnings}
-                      onChange={(v) => s("showUncertainWarnings", v)}
-                    />
-                  </SettingRow>
-                </Section>
-
-                <Section
-                  title="Formatos permitidos"
-                  desc="Qué puedes usar para importar una sesión"
-                >
-                  <SettingRow label="Pegar texto directamente" tight>
-                    <Toggle
-                      value={settings.allowPasteText}
-                      onChange={(v) => s("allowPasteText", v)}
-                    />
-                  </SettingRow>
-                  <SettingRow label="Subir archivos (.txt, .pdf, .docx)" tight>
-                    <Toggle
-                      value={settings.allowFileUpload}
-                      onChange={(v) => s("allowFileUpload", v)}
-                    />
-                  </SettingRow>
-                  <div
-                    className="p-3 rounded-xl border flex items-start gap-2.5"
-                    style={{
-                      borderColor: "var(--ca-border)",
-                      backgroundColor: "var(--ca-bg)",
-                    }}
-                  >
-                    <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
-                    <p
-                      className="text-xs"
-                      style={{ color: "var(--ca-text-muted)" }}
-                    >
-                      Para archivos Word (.docx) o PDF, te recomendamos abrir el
-                      archivo, seleccionar todo el texto (Ctrl+A), copiarlo y
-                      pegarlo directamente. Así la IA lo lee mejor.
-                    </p>
-                  </div>
-                </Section>
-              </>
-            )}
-
-            {/* ─── FONDOS ──────────────────────────────────────── */}
-            {activeTab === "fondos" && (
-              <>
-                <Section title="Imágenes de fondo globales">
-                  <SettingRow
-                    label="Activar imágenes de fondo"
-                    desc="Mostrar imágenes decorativas en la app"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.backgroundsEnabled}
-                      onChange={(v) => s("backgroundsEnabled", v)}
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    label="Modo seguro de legibilidad"
-                    desc="Aplica automáticamente contraste para que el texto siempre se lea"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.readabilitySafe}
-                      onChange={(v) => s("readabilitySafe", v)}
-                    />
-                  </SettingRow>
-                </Section>
-
-                {settings.backgroundsEnabled && (
-                  <>
-                    <Section
-                      title="Fondo de la app"
-                      desc="Imagen que aparece de fondo en todas las pantallas"
-                    >
-                      <div className="space-y-3">
-                        <input
-                          value={settings.appBackground}
-                          onChange={(e) => s("appBackground", e.target.value)}
-                          placeholder="Pega una URL de imagen (https://...)"
-                          className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                          style={{
-                            backgroundColor: "var(--ca-bg)",
-                            borderColor: "var(--ca-border)",
-                            color: "var(--ca-text)",
-                          }}
-                        />
-                        {settings.appBackground && (
-                          <div
-                            className="w-full h-24 rounded-xl overflow-hidden border relative"
-                            style={{ borderColor: "var(--ca-border)" }}
-                          >
-                            <img
-                              src={settings.appBackground}
-                              alt=""
-                              className="w-full h-full object-cover"
-                              onError={(e) => (e.target.style.display = "none")}
-                            />
-                            <button
-                              onClick={() => s("appBackground", "")}
-                              className="absolute top-2 right-2 p-1 bg-black/50 rounded-lg text-white hover:bg-black/70"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </Section>
-
-                    <Section
-                      title="Fondo de modo clase"
-                      desc="Imagen que aparece de fondo durante la clase"
-                    >
-                      <div className="space-y-3">
-                        <input
-                          value={settings.classModeBackground}
-                          onChange={(e) =>
-                            s("classModeBackground", e.target.value)
-                          }
-                          placeholder="Pega una URL de imagen (https://...)"
-                          className="w-full px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                          style={{
-                            backgroundColor: "var(--ca-bg)",
-                            borderColor: "var(--ca-border)",
-                            color: "var(--ca-text)",
-                          }}
-                        />
-                      </div>
-                    </Section>
-
-                    <Section
-                      title="Controles globales del fondo"
-                      desc="Aplican a todos los fondos de la app"
-                    >
-                      <SliderSetting
-                        label="Intensidad del fondo"
-                        desc="Qué tan visible es la imagen"
-                        value={settings.globalBgOpacity}
-                        onChange={(v) => s("globalBgOpacity", v)}
-                      />
-                      <SliderSetting
-                        label="Desenfoque"
-                        desc="Suaviza la imagen de fondo"
-                        value={settings.globalBgBlur}
-                        onChange={(v) => s("globalBgBlur", v)}
-                        min={0}
-                        max={20}
-                        step={1}
-                        format={(v) => v + "px"}
-                      />
-                      <SliderSetting
-                        label="Capa oscura"
-                        desc="Oscurece el fondo para mejor contraste"
-                        value={settings.globalBgDarken}
-                        onChange={(v) => s("globalBgDarken", v)}
-                      />
-                      <SliderSetting
-                        label="Capa clara"
-                        desc="Aclara el fondo para fondos oscuros"
-                        value={settings.globalBgBrighten}
-                        onChange={(v) => s("globalBgBrighten", v)}
-                      />
-                    </Section>
-
-                    <Section title="Biblioteca de fondos sugeridos">
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          {
-                            label: "Aula suave",
-                            url: "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400&q=60",
-                          },
-                          {
-                            label: "Lectura",
-                            url: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&q=60",
-                          },
-                          {
-                            label: "Naturaleza",
-                            url: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=400&q=60",
-                          },
-                          {
-                            label: "Abstracto",
-                            url: "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=400&q=60",
-                          },
-                          {
-                            label: "Minimalista",
-                            url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=60",
-                          },
-                          {
-                            label: "Ciencia",
-                            url: "https://images.unsplash.com/photo-1532094349884-543559059ebb?w=400&q=60",
-                          },
-                        ].map((img) => (
-                          <button
-                            key={img.url}
-                            onClick={() => s("appBackground", img.url)}
-                            className="relative rounded-xl overflow-hidden border-2 transition-all hover:scale-105 aspect-video"
-                            style={{
-                              borderColor:
-                                settings.appBackground === img.url
-                                  ? "var(--ca-primary)"
-                                  : "transparent",
-                            }}
-                          >
-                            <img
-                              src={img.url}
-                              alt={img.label}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/30 flex items-end justify-center pb-1">
-                              <span className="text-white text-[10px] font-semibold">
-                                {img.label}
-                              </span>
-                            </div>
-                            {settings.appBackground === img.url && (
-                              <div className="absolute top-1 right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center">
-                                <Check size={10} className="text-green-600" />
-                              </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </Section>
-                  </>
-                )}
-              </>
-            )}
-
-            {/* ─── DATOS ───────────────────────────────────────── */}
-            {activeTab === "datos" && (
-              <>
-                <Section title="Guardado">
-                  <SettingRow
-                    label="Guardado automático"
-                    desc="Guarda el borrador de tu sesión automáticamente mientras editas"
-                    tight
-                  >
-                    <Toggle
-                      value={settings.autoSave}
-                      onChange={(v) => s("autoSave", v)}
-                    />
-                  </SettingRow>
-                  <div
-                    className="p-4 rounded-xl border flex items-start gap-3"
-                    style={{
-                      borderColor: "var(--ca-border)",
-                      backgroundColor: "var(--ca-bg)",
-                    }}
-                  >
-                    <HardDrive
-                      size={16}
-                      className="text-blue-500 shrink-0 mt-0.5"
-                    />
-                    <div>
-                      <p
-                        className="text-sm font-semibold"
-                        style={{ color: "var(--ca-text)" }}
-                      >
-                        Almacenamiento local
-                      </p>
-                      <p
-                        className="text-xs mt-0.5"
-                        style={{ color: "var(--ca-text-muted)" }}
-                      >
-                        Tus sesiones y configuración se guardan en este
-                        navegador. Si limpias los datos del navegador o usas
-                        otro dispositivo, no las encontrarás. Para respaldo, usa
-                        la opción de exportar.
-                      </p>
-                    </div>
-                  </div>
-                </Section>
-
-                <Section title="Exportar e importar">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      onClick={() => {
-                        const data = {};
-                        for (let i = 0; i < localStorage.length; i++) {
-                          const k = localStorage.key(i);
-                          if (k.startsWith("cronoaula"))
-                            data[k] = localStorage.getItem(k);
-                        }
-                        const blob = new Blob([JSON.stringify(data, null, 2)], {
-                          type: "application/json",
-                        });
-                        const a = document.createElement("a");
-                        a.href = URL.createObjectURL(blob);
-                        a.download = `cronoaula_backup_${new Date().toISOString().split("T")[0]}.json`;
-                        a.click();
-                        toast.success("Datos exportados correctamente");
-                      }}
-                      className="flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold hover:bg-black/5 transition-colors"
-                      style={{
-                        borderColor: "var(--ca-border)",
-                        color: "var(--ca-text)",
-                      }}
-                    >
-                      <Download size={16} /> Exportar mis datos
-                    </button>
-                    <label
-                      className="flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold hover:bg-black/5 transition-colors cursor-pointer"
-                      style={{
-                        borderColor: "var(--ca-border)",
-                        color: "var(--ca-text)",
-                      }}
-                    >
-                      <Upload size={16} /> Importar datos
-                      <input
-                        type="file"
-                        accept=".json"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = (ev) => {
-                            try {
-                              const data = JSON.parse(ev.target.result);
-                              Object.entries(data).forEach(([k, v]) =>
-                                localStorage.setItem(k, v),
-                              );
-                              toast.success(
-                                "Datos importados. Recarga la página.",
-                              );
-                            } catch {
-                              toast.error("Archivo inválido");
-                            }
-                          };
-                          reader.readAsText(file);
-                        }}
-                      />
-                    </label>
-                  </div>
-                </Section>
-
-                <Section title="Zona de peligro">
-                  <div className="p-4 rounded-xl border border-red-200 bg-red-50 space-y-3">
-                    <p className="text-sm font-bold text-red-700 flex items-center gap-2">
-                      <AlertTriangle size={14} /> Estas acciones no se pueden
-                      deshacer
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={handleReset}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 text-red-600 bg-white text-sm font-semibold hover:bg-red-50 transition-colors"
-                      >
-                        <RotateCcw size={14} /> Restaurar configuración
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (
-                            !confirm(
-                              "¿Eliminar TODAS las sesiones y datos locales? Esta acción es irreversible.",
-                            )
-                          )
-                            return;
-                          localStorage.clear();
-                          toast.success("Datos eliminados. Recarga la página.");
-                          setTimeout(() => window.location.reload(), 1500);
-                        }}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-300 text-red-700 bg-white text-sm font-semibold hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 size={14} /> Borrar todos los datos
-                      </button>
-                    </div>
-                  </div>
-                </Section>
-              </>
-            )}
-          </div>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-900">
+              <div className="mb-2 flex items-center gap-2 font-black">
+                <Check size={18} /> Sin conexión a servidor
+              </div>
+              Los datos del docente, sesiones y preferencias se conservan al
+              recargar mientras no borres los datos del navegador.
+            </div>
+          </Card>
         </div>
       </div>
     </div>

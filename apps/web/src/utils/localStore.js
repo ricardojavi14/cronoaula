@@ -27,6 +27,11 @@ export function getTeacher() {
   return readJson(CA_TEACHER_KEY, {
     id: "local-teacher",
     name: "Docente",
+    institution: "",
+    defaultGrade: "",
+    defaultArea: "Comunicacion",
+    defaultDuration: 90,
+    classroomContext: "",
     grade: "5.° primaria",
     school: "I.E. José Olaya Balandra",
   });
