@@ -1,374 +1,246 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  BookOpen,
+  ChevronRight,
+  Clock3,
+  FileText,
   Play,
   Plus,
-  BookOpen,
-  Calendar,
-  HelpCircle,
-  Clock,
-  ChevronRight,
-  Zap,
-  Star,
+  Sparkles,
   Timer,
-  FileText,
-  Layers,
-  AlertTriangle,
-  Settings,
 } from "lucide-react";
 import { useTeacher } from "./client-layout";
+import { getSessions } from "@/utils/localStore";
+
+function getSessionDuration(session) {
+  if (session?.total_duration) return Number(session.total_duration) || 0;
+  if (session?.duration) return Number(session.duration) || 0;
+  return (session?.moments || []).reduce((total, moment) => {
+    const subTotal = (moment.submoments || []).reduce((sum, sub) => sum + (Number(sub.duration) || 0), 0);
+    return total + (subTotal || Number(moment.duration) || 0);
+  }, 0);
+}
+
+function getSessionDate(session) {
+  return new Date(session?.last_modified || session?.updated_at || session?.created_at || session?.date || 0).getTime();
+}
+
+function formatDuration(minutes) {
+  if (!minutes) return "Sin duración";
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest ? `${hours}h ${rest}m` : `${hours}h`;
+  }
+  return `${minutes} min`;
+}
 
 export default function HomePage() {
   const { teacher, loading } = useTeacher();
-  const [lastSession, setLastSession] = useState(null);
-  const [todaySessions, setTodaySessions] = useState([]);
+  const [sessions, setSessions] = useState([]);
 
   useEffect(() => {
-    if (!teacher) return;
-    fetch(`/api/sessions?teacher_id=${teacher.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setLastSession(data[0]);
-          const today = new Date().toISOString().split("T")[0];
-          setTodaySessions(data.filter((s) => s.date === today));
-        }
-      })
-      .catch(console.error);
-  }, [teacher]);
+    setSessions(getSessions());
+
+    const refresh = () => setSessions(getSessions());
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+
+  const recentSessions = useMemo(
+    () => [...sessions].sort((a, b) => getSessionDate(b) - getSessionDate(a)).slice(0, 5),
+    [sessions],
+  );
+  const latestSession = recentSessions[0] || null;
+  const teacherName = teacher?.name?.trim()?.split(" ")[0] || "docente";
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-3">
-          <div
-            className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"
-            style={{ animation: "spin 0.8s linear infinite" }}
-          />
-          <p className="text-slate-500 text-sm">Cargando tu tablero...</p>
+      <div className="flex min-h-[55vh] items-center justify-center">
+        <div className="space-y-3 text-center">
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-[var(--ca-primary,#2563eb)] border-t-transparent" />
+          <p className="text-sm" style={{ color: "var(--ca-text-muted, #64748b)" }}>Preparando CronoAula...</p>
         </div>
-        <style
-          jsx
-          global
-        >{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5 pb-16">
-      {/* Welcome bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-        <div>
-          <h1
-            className="text-2xl font-bold"
-            style={{ color: "var(--ca-text, #1e293b)" }}
-          >
-            {teacher
-              ? `Hola, ${teacher.name?.split(" ")[0]} 👋`
-              : "Bienvenido a CronoAula"}
-          </h1>
-          <p
-            className="text-sm mt-0.5"
-            style={{ color: "var(--ca-text-muted, #64748b)" }}
-          >
-            {teacher
-              ? `${teacher.area_principal || "Docente"} · ${teacher.grade || ""}`
-              : "Tu asistente pedagógico de aula"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {!teacher && (
-            <a
-              href="/onboarding"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-sm font-semibold hover:bg-amber-100 transition-colors"
-            >
-              <Star size={14} /> Configura tu perfil
-            </a>
-          )}
+    <div className="mx-auto max-w-5xl space-y-6 pb-14">
+      <section className="pt-2">
+        <p className="text-sm font-bold uppercase tracking-[0.22em]" style={{ color: "var(--ca-text-muted, #64748b)" }}>
+          Inicio rápido
+        </p>
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight sm:text-4xl" style={{ color: "var(--ca-text, #0f172a)" }}>
+              Hola, {teacherName}
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm sm:text-base" style={{ color: "var(--ca-text-muted, #64748b)" }}>
+              Elige una sesión guardada y empieza el modo clase en pocos clics.
+            </p>
+          </div>
           <a
-            href="/settings"
-            className="p-2 rounded-xl hover:bg-black/5 transition-colors"
-            title="Configuración de CronoAula"
-            style={{ color: "var(--ca-text-muted, #64748b)" }}
+            href="/sessions"
+            className="inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition hover:brightness-105"
+            style={{
+              borderColor: "var(--ca-border, #e2e8f0)",
+              color: "var(--ca-text, #0f172a)",
+              backgroundColor: "var(--ca-surface, #fff)",
+            }}
           >
-            <Settings size={20} />
+            <BookOpen size={16} /> Ver mis sesiones
           </a>
         </div>
-      </div>
+      </section>
 
-      {/* HERO: Modo Clase */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 to-blue-900 text-white p-6 md:p-8 shadow-lg">
-        <div className="relative z-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-3 max-w-xl">
-              <div className="inline-flex items-center gap-2 bg-white/15 rounded-full px-3 py-1 text-xs font-semibold text-blue-100">
-                <Timer size={12} /> Función principal
+      {latestSession ? (
+        <section
+          className="overflow-hidden rounded-[2rem] border p-5 shadow-sm sm:p-6"
+          style={{
+            background:
+              "linear-gradient(135deg, color-mix(in srgb, var(--ca-primary,#2563eb) 16%, transparent), transparent 42%), var(--ca-surface, #fff)",
+            borderColor: "var(--ca-border, #e2e8f0)",
+          }}
+        >
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black" style={{ borderColor: "var(--ca-border, #e2e8f0)", color: "var(--ca-text-muted, #64748b)" }}>
+                <Timer size={13} /> Sesión más reciente
               </div>
-              <h2 className="text-3xl md:text-4xl font-extrabold leading-tight">
-                Modo Clase
-              </h2>
-              <p className="text-blue-100 leading-relaxed text-sm">
-                Temporizador grande, notas docentes y control de momentos. Listo
-                para proyector y aula real.
-              </p>
-              <div className="flex flex-wrap gap-3 pt-1">
-                {lastSession ? (
-                  <a
-                    href={`/class-mode/${lastSession.id}`}
-                    className="flex items-center gap-2 px-5 py-3 bg-white text-blue-700 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors shadow-md"
-                  >
-                    <Play size={16} fill="currentColor" /> Continuar última
-                    sesión
-                  </a>
-                ) : (
-                  <a
-                    href="/sessions"
-                    className="flex items-center gap-2 px-5 py-3 bg-white text-blue-700 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors shadow-md"
-                  >
-                    <Play size={16} fill="currentColor" /> Iniciar modo clase
-                  </a>
-                )}
-                <a
-                  href="/sessions"
-                  className="flex items-center gap-2 px-5 py-3 bg-blue-600/60 border border-white/20 text-white rounded-xl font-bold text-sm hover:bg-blue-600/80 transition-colors"
-                >
-                  <BookOpen size={16} /> Ver sesiones
-                </a>
-              </div>
-            </div>
-            <div className="hidden md:flex flex-col items-center justify-center w-48 h-48 rounded-2xl bg-white/10 border border-white/20 shrink-0">
-              <div className="text-5xl font-mono font-black text-white tabular-nums">
-                12:34
-              </div>
-              <div className="text-blue-200 text-xs font-semibold mt-2 uppercase tracking-widest">
-                Tiempo restante
-              </div>
-              <div className="mt-3 w-28 h-2 bg-white/20 rounded-full overflow-hidden">
-                <div className="h-full w-3/5 bg-white rounded-full" />
-              </div>
-            </div>
-          </div>
-          {todaySessions.length > 0 && (
-            <div className="mt-5 pt-4 border-t border-white/20">
-              <p className="text-blue-200 text-xs font-semibold uppercase tracking-wider mb-2">
-                Sesiones de hoy
-              </p>
-              <div className="flex gap-2 flex-wrap">
-                {todaySessions.map((s) => (
-                  <a
-                    key={s.id}
-                    href={`/class-mode/${s.id}`}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-white/10 border border-white/20 rounded-lg text-sm font-medium hover:bg-white/20 transition-colors"
-                  >
-                    <Play size={11} fill="white" /> {s.title}
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="absolute -top-12 -right-12 w-64 h-64 bg-white/5 rounded-full" />
-        <div className="absolute -bottom-16 -right-8 w-48 h-48 bg-white/5 rounded-full" />
-      </div>
-
-      {/* Quick actions grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <QuickCard
-          href="/create"
-          icon={<Plus size={20} className="text-blue-700" />}
-          iconBg="bg-blue-100"
-          title="Crear sesión"
-          desc="Arma una sesión con momentos, tiempos y notas."
-          cta="Crear ahora"
-          ctaColor="text-blue-700"
-          cardBg="bg-blue-50 border-blue-100"
-        />
-        <QuickCard
-          href="/sessions"
-          icon={<BookOpen size={20} className="text-emerald-700" />}
-          iconBg="bg-emerald-100"
-          title="Mis sesiones"
-          desc="Edita, duplica o reutiliza sesiones."
-          cta="Abrir biblioteca"
-          ctaColor="text-emerald-700"
-          cardBg="bg-emerald-50 border-emerald-100"
-        />
-        <QuickCard
-          href="/agenda"
-          icon={<Calendar size={20} className="text-violet-700" />}
-          iconBg="bg-violet-100"
-          title="Agenda diaria"
-          desc="Organiza todas tus clases del día."
-          cta="Ver agenda"
-          ctaColor="text-violet-700"
-          cardBg="bg-violet-50 border-violet-100"
-        />
-        <QuickCard
-          href="/tutorial"
-          icon={<HelpCircle size={20} className="text-amber-700" />}
-          iconBg="bg-amber-100"
-          title="Tutorial"
-          desc="Aprende a usar CronoAula paso a paso."
-          cta="Ver tutorial"
-          ctaColor="text-amber-700"
-          cardBg="bg-amber-50 border-amber-100"
-        />
-      </div>
-
-      {/* Last session + quick create */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <Clock size={15} className="text-slate-400" /> Última sesión
-            </h3>
-            <a
-              href="/sessions"
-              className="text-xs text-blue-600 hover:underline font-medium"
-            >
-              Ver todas →
-            </a>
-          </div>
-          {lastSession ? (
-            <div className="space-y-3">
               <div>
-                <p className="font-semibold text-slate-800">
-                  {lastSession.title}
+                <h2 className="truncate text-2xl font-black sm:text-3xl" style={{ color: "var(--ca-text, #0f172a)" }}>
+                  {latestSession.title || "Sesión sin título"}
+                </h2>
+                <p className="mt-1 text-sm" style={{ color: "var(--ca-text-muted, #64748b)" }}>
+                  {latestSession.area || "Área sin registrar"} · {latestSession.grade || "Grado sin registrar"} · {formatDuration(getSessionDuration(latestSession))}
                 </p>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  {lastSession.area} · {lastSession.grade} ·{" "}
-                  {lastSession.total_duration} min
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <a
-                  href={`/class-mode/${lastSession.id}`}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
-                >
-                  <Play size={13} fill="white" /> Iniciar
-                </a>
-                <a
-                  href={`/create?id=${lastSession.id}`}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
-                >
-                  Editar
-                </a>
               </div>
             </div>
-          ) : (
-            <div className="text-center py-4 space-y-3">
-              <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center mx-auto">
-                <FileText size={18} className="text-slate-400" />
-              </div>
-              <p className="text-slate-500 text-sm">
-                Aún no tienes sesiones guardadas.
-              </p>
+
+            <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+              <a
+                href={`/class-mode/${latestSession.id}`}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg transition hover:brightness-110"
+                style={{ backgroundColor: "var(--ca-primary, #2563eb)" }}
+              >
+                <Play size={17} fill="currentColor" /> Continuar clase
+              </a>
               <a
                 href="/create"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-bold transition hover:brightness-105"
+                style={{
+                  borderColor: "var(--ca-border, #e2e8f0)",
+                  color: "var(--ca-text, #0f172a)",
+                  backgroundColor: "color-mix(in srgb, var(--ca-surface,#fff) 88%, transparent)",
+                }}
               >
-                <Plus size={14} /> Crear ahora
+                <Plus size={17} /> Crear sesión
               </a>
             </div>
-          )}
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-violet-100 rounded-lg flex items-center justify-center">
-              <Zap size={13} className="text-violet-600" />
-            </div>
-            <h3 className="font-bold text-slate-800 text-sm">
-              Creación rápida con IA
-            </h3>
           </div>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            Pega el texto de tu planificación o sube un archivo y la IA extrae
-            todos los momentos y tiempos automáticamente.
+        </section>
+      ) : (
+        <section
+          className="rounded-[2rem] border p-6 text-center shadow-sm"
+          style={{ backgroundColor: "var(--ca-surface, #fff)", borderColor: "var(--ca-border, #e2e8f0)" }}
+        >
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: "color-mix(in srgb, var(--ca-primary,#2563eb) 12%, transparent)", color: "var(--ca-primary,#2563eb)" }}>
+            <FileText size={23} />
+          </div>
+          <h2 className="mt-4 text-2xl font-black" style={{ color: "var(--ca-text, #0f172a)" }}>Aún no tienes sesiones guardadas</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm" style={{ color: "var(--ca-text-muted, #64748b)" }}>
+            Crea una sesión desde cero o importa una planificación para empezar a usar el modo clase.
           </p>
-          <div className="flex flex-col gap-2">
-            <a
-              href="/create?tab=import"
-              className="flex items-center justify-between px-4 py-3 bg-violet-50 border border-violet-100 rounded-xl hover:bg-violet-100 transition-colors group"
-            >
-              <span className="text-sm font-semibold text-violet-800">
-                Importar planificación con IA
-              </span>
-              <ChevronRight size={15} className="text-violet-400" />
+          <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+            <a href="/create" className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white transition hover:brightness-110" style={{ backgroundColor: "var(--ca-primary,#2563eb)" }}>
+              <Plus size={17} /> Crear primera sesión
             </a>
-            <a
-              href="/create"
-              className="flex items-center justify-between px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl hover:bg-slate-100 transition-colors group"
-            >
-              <span className="text-sm font-semibold text-slate-700">
-                Crear sesión desde cero
-              </span>
-              <ChevronRight size={15} className="text-slate-400" />
+            <a href="/create?tab=import" className="inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-bold transition hover:brightness-105" style={{ borderColor: "var(--ca-border,#e2e8f0)", color: "var(--ca-text,#0f172a)" }}>
+              <Sparkles size={17} /> Importar planificación
             </a>
           </div>
-        </div>
-      </div>
+        </section>
+      )}
 
-      {/* Features strip */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <FeatureCard
-          icon={<Timer size={16} className="text-blue-600" />}
-          iconBg="bg-blue-100"
-          title="Gestión de tiempos"
-          text="Suma automática, redistribución proporcional y alertas de tiempo."
-        />
-        <FeatureCard
-          icon={<Layers size={16} className="text-emerald-600" />}
-          iconBg="bg-emerald-100"
-          title="Momentos pedagógicos"
-          text="Inicio, Desarrollo, Cierre y más, con submomentos y notas docentes."
-        />
-        <FeatureCard
-          icon={<AlertTriangle size={16} className="text-amber-600" />}
-          iconBg="bg-amber-100"
-          title="Ajuste por inicio tardío"
-          text="Si empiezas tarde, CronoAula redistribuye los tiempos con un clic."
-        />
-      </div>
+      <section className="grid gap-2 sm:grid-cols-3">
+        <QuickAction href="/create" icon={<Plus size={18} />} label="Crear sesión" />
+        <QuickAction href="/create?tab=import" icon={<Sparkles size={18} />} label="Importar planificación" />
+        <QuickAction href="/sessions" icon={<BookOpen size={18} />} label="Ver mis sesiones" />
+      </section>
+
+      {recentSessions.length > 0 && (
+        <section
+          className="rounded-[1.5rem] border p-4"
+          style={{ backgroundColor: "var(--ca-surface, #fff)", borderColor: "var(--ca-border, #e2e8f0)" }}
+        >
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-[0.18em]" style={{ color: "var(--ca-text-muted, #64748b)" }}>
+              Sesiones recientes
+            </h2>
+            <a href="/sessions" className="text-sm font-bold hover:underline" style={{ color: "var(--ca-primary, #2563eb)" }}>
+              Ver todas
+            </a>
+          </div>
+          <div className="divide-y" style={{ borderColor: "var(--ca-border, #e2e8f0)" }}>
+            {recentSessions.map((session) => (
+              <RecentSessionRow key={session.id} session={session} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
 
-function QuickCard({ href, icon, iconBg, title, desc, cta, ctaColor, cardBg }) {
+function QuickAction({ href, icon, label }) {
   return (
     <a
       href={href}
-      className={`${cardBg} border rounded-2xl p-4 flex flex-col gap-3 hover:shadow-md transition-all group`}
+      className="group flex items-center justify-between rounded-2xl border px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-sm"
+      style={{ backgroundColor: "var(--ca-surface, #fff)", borderColor: "var(--ca-border, #e2e8f0)", color: "var(--ca-text, #0f172a)" }}
     >
-      <div
-        className={`w-9 h-9 ${iconBg} rounded-xl flex items-center justify-center`}
-      >
-        {icon}
-      </div>
-      <div className="flex-1">
-        <h3 className="font-bold text-slate-800 text-sm">{title}</h3>
-        <p className="text-slate-600 text-xs mt-1 leading-relaxed">{desc}</p>
-      </div>
-      <div className={`flex items-center gap-1 text-xs font-bold ${ctaColor}`}>
-        {cta} <ChevronRight size={12} />
-      </div>
+      <span className="flex items-center gap-2 text-sm font-black">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--ca-primary,#2563eb) 12%, transparent)", color: "var(--ca-primary,#2563eb)" }}>
+          {icon}
+        </span>
+        {label}
+      </span>
+      <ChevronRight size={17} className="transition group-hover:translate-x-0.5" />
     </a>
   );
 }
 
-function FeatureCard({ icon, iconBg, title, text }) {
+function RecentSessionRow({ session }) {
+  const duration = getSessionDuration(session);
+
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 flex gap-3 shadow-sm">
-      <div
-        className={`w-8 h-8 ${iconBg} rounded-lg flex items-center justify-center shrink-0`}
+    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-black" style={{ color: "var(--ca-text, #0f172a)" }}>
+          {session.title || "Sesión sin título"}
+        </p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style={{ color: "var(--ca-text-muted, #64748b)" }}>
+          <span>{session.area || "Área"}</span>
+          <span>·</span>
+          <span>{session.grade || "Grado"}</span>
+          <span>·</span>
+          <span className="inline-flex items-center gap-1"><Clock3 size={12} /> {formatDuration(duration)}</span>
+        </p>
+      </div>
+      <a
+        href={`/class-mode/${session.id}`}
+        className="inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black text-white transition hover:brightness-110 sm:shrink-0"
+        style={{ backgroundColor: "var(--ca-primary, #2563eb)" }}
       >
-        {icon}
-      </div>
-      <div>
-        <h4 className="font-bold text-slate-800 text-sm">{title}</h4>
-        <p className="text-slate-500 text-xs mt-0.5 leading-relaxed">{text}</p>
-      </div>
+        <Play size={12} fill="currentColor" /> Iniciar
+      </a>
     </div>
   );
 }
