@@ -129,9 +129,81 @@ function getFontSize(settings) {
 
 function getTimerClass(timerSize, large = false) {
   if (timerSize === "gigante") {
-    return large ? "text-[96px] sm:text-[150px] lg:text-[190px]" : "text-[82px] sm:text-[120px]";
+    return large ? "text-[74px] sm:text-[112px] lg:text-[142px]" : "text-[68px] sm:text-[104px]";
   }
-  return large ? "text-[82px] sm:text-[126px] lg:text-[160px]" : "text-[72px] sm:text-[104px]";
+  return large ? "text-[66px] sm:text-[98px] lg:text-[126px]" : "text-[60px] sm:text-[92px]";
+}
+
+function getClassModeTheme(settings) {
+  const selected = settings.classModeTheme || (settings.darkModeInClass ? "oscuro" : settings.theme) || "oscuro";
+  if (settings.highContrastMode || selected === "contraste") {
+    return {
+      key: "contrast",
+      bg: "#000000",
+      text: "#FFFFFF",
+      muted: "#FACC15",
+      panel: "rgba(255,255,255,0.06)",
+      panelStrong: "rgba(255,255,255,0.11)",
+      border: "#FACC15",
+      softBorder: "rgba(250,204,21,0.45)",
+      progressBg: "rgba(255,255,255,0.22)",
+      glow: "radial-gradient(circle at 50% 0%, rgba(250,204,21,0.18), transparent 36%)",
+    };
+  }
+  if (selected === "claro" || selected === "minimalista" || selected === "colorido") {
+    return {
+      key: "light",
+      bg: "#F8FAFC",
+      text: "#0F172A",
+      muted: "#475569",
+      panel: "rgba(255,255,255,0.76)",
+      panelStrong: "rgba(255,255,255,0.92)",
+      border: "rgba(15,23,42,0.12)",
+      softBorder: "rgba(15,23,42,0.08)",
+      progressBg: "rgba(15,23,42,0.13)",
+      glow: "radial-gradient(circle at 50% 0%, rgba(56,189,248,0.22), transparent 38%)",
+    };
+  }
+  if (selected === "calido") {
+    return {
+      key: "warm",
+      bg: "#FFF7ED",
+      text: "#3D2B1F",
+      muted: "#8A5A36",
+      panel: "rgba(255,255,255,0.62)",
+      panelStrong: "rgba(255,255,255,0.84)",
+      border: "rgba(154,89,38,0.18)",
+      softBorder: "rgba(154,89,38,0.12)",
+      progressBg: "rgba(154,89,38,0.16)",
+      glow: "radial-gradient(circle at 50% 0%, rgba(245,158,11,0.20), transparent 38%)",
+    };
+  }
+  if (selected === "imagen") {
+    return {
+      key: "image-ready",
+      bg: "#080B12",
+      text: "#F8FAFC",
+      muted: "#CBD5E1",
+      panel: "rgba(8,11,18,0.58)",
+      panelStrong: "rgba(8,11,18,0.76)",
+      border: "rgba(255,255,255,0.12)",
+      softBorder: "rgba(255,255,255,0.08)",
+      progressBg: "rgba(255,255,255,0.14)",
+      glow: "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.12), transparent 38%)",
+    };
+  }
+  return {
+    key: "dark",
+    bg: "#070B13",
+    text: "#F8FAFC",
+    muted: "#94A3B8",
+    panel: "rgba(255,255,255,0.045)",
+    panelStrong: "rgba(255,255,255,0.07)",
+    border: "rgba(255,255,255,0.10)",
+    softBorder: "rgba(255,255,255,0.07)",
+    progressBg: "rgba(255,255,255,0.12)",
+    glow: "radial-gradient(circle at 50% 0%, rgba(56,189,248,0.18), transparent 36%), radial-gradient(circle at 80% 80%, rgba(34,197,94,0.12), transparent 36%)",
+  };
 }
 
 function getUrgency(timeLeft, durationSeconds) {
@@ -226,6 +298,7 @@ export default function ClassModePage({ params }) {
     currentMomentIdx === moments.length - 1 &&
     currentSubIdx === (currentMoment.submoments?.length || 1) - 1;
   const urgency = getUrgency(timeLeft, currentDurationSeconds);
+  const classTheme = getClassModeTheme(settings);
 
   useEffect(() => {
     if (!isActive || showSummary) return;
@@ -380,12 +453,22 @@ export default function ClassModePage({ params }) {
     "--ca-accent": accent,
     "--ca-on-accent": onAccent,
     "--ca-urgency": urgency.color,
+    "--cm-bg": classTheme.bg,
+    "--cm-text": classTheme.text,
+    "--cm-muted": classTheme.muted,
+    "--cm-panel": classTheme.panel,
+    "--cm-panel-strong": classTheme.panelStrong,
+    "--cm-border": classTheme.border,
+    "--cm-soft-border": classTheme.softBorder,
+    "--cm-progress-bg": classTheme.progressBg,
     fontSize: getFontSize(settings),
+    backgroundColor: classTheme.bg,
+    color: classTheme.text,
   };
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden bg-[#070B13] text-white" style={shellVars}>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.13),transparent_34%)]" />
+    <div className="fixed inset-0 z-[100] overflow-hidden" style={shellVars}>
+      <div className="absolute inset-0" style={{ background: classTheme.glow }} />
       <div className="relative flex h-full flex-col">
         <TopBar
           session={session}
@@ -398,7 +481,7 @@ export default function ClassModePage({ params }) {
           setShowLateStart={setShowLateStart}
         />
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
+        <main className={`min-h-0 flex-1 px-3 py-2 md:px-5 md:py-3 ${viewMode === "class" ? "overflow-hidden" : "overflow-y-auto"}`}>
           {viewMode === "teacher" ? (
             <TeacherView
               session={session}
@@ -498,14 +581,21 @@ function TopBar({
   setShowLateStart,
 }) {
   return (
-    <header className="relative z-10 flex min-h-16 items-center justify-between gap-3 border-b border-white/10 bg-slate-950/70 px-4 backdrop-blur-xl md:px-6">
+    <header
+      className="relative z-10 flex min-h-12 items-center justify-between gap-3 border-b px-3 backdrop-blur-xl md:px-5"
+      style={{ backgroundColor: "var(--cm-panel-strong)", borderColor: "var(--cm-soft-border)" }}
+    >
       <div className="flex min-w-0 items-center gap-3">
-        <a href="/sessions" className="rounded-full border border-white/10 p-2 text-slate-300 transition hover:bg-white/10">
+        <a
+          href="/sessions"
+          className="rounded-full border p-1.5 transition hover:brightness-110"
+          style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-border)", color: "var(--cm-muted)" }}
+        >
           <ArrowLeft size={18} />
         </a>
         <div className="min-w-0">
-          <h1 className="truncate text-sm font-black text-white md:text-base">{session.title}</h1>
-          <p className="truncate text-xs text-slate-400">{session.area || "Área sin registrar"} · {session.grade || "Grado sin registrar"}</p>
+          <h1 className="truncate text-sm font-black md:text-base" style={{ color: "var(--cm-text)" }}>{session.title}</h1>
+          <p className="truncate text-xs" style={{ color: "var(--cm-muted)" }}>{session.area || "Área sin registrar"} · {session.grade || "Grado sin registrar"}</p>
         </div>
       </div>
       <div className="flex items-center gap-2 overflow-x-auto">
@@ -515,7 +605,8 @@ function TopBar({
         <ModeButton active={fullscreenMode} onClick={toggleFullscreen} icon={fullscreenMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} label="Pantalla completa" />
         <button
           onClick={() => setShowLateStart(true)}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-200 transition hover:bg-amber-300/15"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition hover:brightness-110"
+          style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.14)", color: "#F59E0B" }}
         >
           <AlertTriangle size={14} /> <span className="hidden sm:inline">Empecé tarde</span>
         </button>
@@ -530,9 +621,9 @@ function ModeButton({ active, onClick, icon, label }) {
       onClick={onClick}
       className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition"
       style={{
-        backgroundColor: active ? "var(--ca-accent)" : "rgba(255,255,255,0.06)",
-        borderColor: active ? "var(--ca-accent)" : "rgba(255,255,255,0.1)",
-        color: active ? "var(--ca-on-accent)" : "#CBD5E1",
+        backgroundColor: active ? "var(--ca-accent)" : "var(--cm-panel)",
+        borderColor: active ? "var(--ca-accent)" : "var(--cm-soft-border)",
+        color: active ? "var(--ca-on-accent)" : "var(--cm-muted)",
       }}
     >
       {icon}
@@ -572,13 +663,16 @@ function TeacherView(props) {
 
   return (
     <div className={`mx-auto grid max-w-7xl gap-5 ${focusMode ? "" : "xl:grid-cols-[minmax(0,1fr)_340px]"}`}>
-      <section className="min-w-0 rounded-[2rem] border border-white/10 bg-white/[0.055] p-5 shadow-2xl shadow-black/30 backdrop-blur-xl md:p-7">
+      <section
+        className="min-w-0 rounded-[2rem] border p-5 shadow-2xl backdrop-blur-xl md:p-7"
+        style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)" }}
+      >
         <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
           <div className="space-y-5">
-            <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Vista docente</p>
+            <p className="text-xs font-black uppercase tracking-[0.25em]" style={{ color: "var(--cm-muted)" }}>Vista docente</p>
             <div>
-              <p className="mb-2 text-sm font-bold text-slate-400">Momento {currentMomentIdx + 1} de {moments.length}</p>
-              <h2 className="text-4xl font-black leading-tight text-white md:text-6xl">{currentMoment.name}</h2>
+              <p className="mb-2 text-sm font-bold" style={{ color: "var(--cm-muted)" }}>Momento {currentMomentIdx + 1} de {moments.length}</p>
+              <h2 className="text-4xl font-black leading-tight md:text-6xl" style={{ color: "var(--cm-text)" }}>{currentMoment.name}</h2>
             </div>
             <ActivityBlock
               title={currentActivityName}
@@ -650,15 +744,18 @@ function ClassView(props) {
   } = props;
 
   return (
-    <div className="mx-auto flex min-h-full max-w-6xl flex-col justify-center gap-5 py-4 text-center">
-      <section className="rounded-[2.5rem] border border-white/10 bg-white/[0.045] px-5 py-8 shadow-2xl shadow-black/40 backdrop-blur-xl md:px-10 md:py-10">
-        <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Modo clase</p>
-        <h2 className="mt-3 text-5xl font-black leading-none text-white md:text-7xl">{currentMoment.name}</h2>
-        <p className="mt-3 text-sm font-semibold text-slate-400">
+    <div className="mx-auto flex h-full max-w-6xl flex-col justify-center gap-2 text-center">
+      <section
+        className="rounded-[2rem] border px-4 py-4 shadow-2xl backdrop-blur-xl md:px-8 md:py-5"
+        style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)" }}
+      >
+        <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: "var(--cm-muted)" }}>Modo clase</p>
+        <h2 className="mt-1 text-4xl font-black leading-none md:text-6xl" style={{ color: "var(--cm-text)" }}>{currentMoment.name}</h2>
+        <p className="mt-2 text-xs font-semibold md:text-sm" style={{ color: "var(--cm-muted)" }}>
           {session.area || "Área"} · {session.grade || "Grado"} · Momento {currentMomentIdx + 1} de {moments.length}
         </p>
 
-        <div className="mx-auto mt-8 max-w-4xl">
+        <div className="mx-auto mt-4 max-w-4xl">
           <TimerPanel
             timeLeft={timeLeft}
             totalSessionLeft={totalSessionLeft}
@@ -668,17 +765,18 @@ function ClassView(props) {
           />
         </div>
 
-        <div className="mx-auto mt-7 max-w-3xl text-left">
+        <div className="mx-auto mt-3 max-w-3xl text-left">
           <ActivityBlock
             title={currentActivityName}
             text={activityText}
             expanded={activityExpanded}
             setExpanded={setActivityExpanded}
             clean
+            brief
           />
         </div>
 
-        <div className="mx-auto mt-7 max-w-4xl space-y-4">
+        <div className="mx-auto mt-4 max-w-4xl space-y-3">
           <ProgressPair currentProgress={currentProgress} generalProgress={generalProgress} urgency={urgency} />
           <ControlRow
             isActive={isActive}
@@ -694,7 +792,7 @@ function ClassView(props) {
       </section>
 
       {!focusMode && (
-        <div className="grid gap-4 md:grid-cols-[1fr_1.6fr]">
+        <div className="grid gap-2 md:grid-cols-[0.8fr_1.8fr]">
           <NextMomentCard nextSub={nextSub} nextMomentLabel={nextMomentLabel} isLastActivity={isLastActivity} compact />
           <MomentChips moments={moments} currentMomentIdx={currentMomentIdx} />
         </div>
@@ -705,8 +803,11 @@ function ClassView(props) {
 
 function TimerPanel({ timeLeft, totalSessionLeft, urgency, large, timerSize }) {
   return (
-    <div className="rounded-[2rem] border border-white/10 bg-black/35 p-6 shadow-inner shadow-black/40">
-      <div className="mb-4 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.25em]" style={{ color: urgency.color }}>
+    <div
+      className={large ? "p-1" : "rounded-[1.75rem] border p-4 shadow-inner md:p-5"}
+      style={large ? undefined : { backgroundColor: "var(--cm-panel-strong)", borderColor: "var(--cm-soft-border)" }}
+    >
+      <div className="mb-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] md:text-xs" style={{ color: urgency.color }}>
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: urgency.color }} />
         {urgency.label}
       </div>
@@ -716,21 +817,24 @@ function TimerPanel({ timeLeft, totalSessionLeft, urgency, large, timerSize }) {
       >
         {formatClock(timeLeft)}
       </div>
-      <p className="mt-4 text-sm font-bold text-slate-400">Sesión restante: {formatMinutes(totalSessionLeft)}</p>
+      <p className="mt-2 text-xs font-bold md:text-sm" style={{ color: "var(--cm-muted)" }}>Sesión restante: {formatMinutes(totalSessionLeft)}</p>
     </div>
   );
 }
 
-function ActivityBlock({ title, text, note, expanded, setExpanded, clean }) {
+function ActivityBlock({ title, text, note, expanded, setExpanded, clean, brief }) {
   return (
-    <div className={`${clean ? "" : "rounded-3xl border border-white/10 bg-white/[0.045] p-4"} space-y-3`}>
-      <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Actividad de aprendizaje</p>
-      <h3 className="text-xl font-black text-white md:text-2xl">{title}</h3>
-      <p className={`whitespace-pre-line text-base leading-relaxed text-slate-200 md:text-lg ${expanded ? "" : "line-clamp-5"}`}>
+    <div
+      className={`${clean ? "" : "rounded-3xl border p-4"} space-y-2`}
+      style={clean ? undefined : { backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)" }}
+    >
+      <p className="text-[10px] font-black uppercase tracking-[0.25em] md:text-xs" style={{ color: "var(--cm-muted)" }}>Actividad de aprendizaje</p>
+      <h3 className="text-lg font-black md:text-xl" style={{ color: "var(--cm-text)" }}>{title}</h3>
+      <p className={`whitespace-pre-line text-sm leading-relaxed md:text-base ${expanded ? "" : brief ? "line-clamp-2" : "line-clamp-5"}`} style={{ color: "var(--cm-text)" }}>
         {text || "Actividad sin descripción registrada."}
       </p>
       {hasLongText(text) && (
-        <button onClick={() => setExpanded((v) => !v)} className="text-sm font-black text-cyan-200 hover:text-white">
+        <button onClick={() => setExpanded((v) => !v)} className="text-sm font-black hover:brightness-110" style={{ color: "var(--ca-accent)" }}>
           {expanded ? "Ver menos" : "Ver completo"}
         </button>
       )}
@@ -746,7 +850,7 @@ function ActivityBlock({ title, text, note, expanded, setExpanded, clean }) {
 
 function ProgressPair({ currentProgress, generalProgress, urgency }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <ProgressBar label="Momento" value={currentProgress} color={urgency.color} />
       <ProgressBar label="Sesión" value={generalProgress} color="var(--ca-accent)" />
     </div>
@@ -756,11 +860,11 @@ function ProgressPair({ currentProgress, generalProgress, urgency }) {
 function ProgressBar({ label, value, color }) {
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+      <div className="flex items-center justify-between text-xs font-bold" style={{ color: "var(--cm-muted)" }}>
         <span>{label}</span>
         <span>{Math.round(value)}%</span>
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+      <div className="h-2.5 overflow-hidden rounded-full" style={{ backgroundColor: "var(--cm-progress-bg)" }}>
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${Math.max(0, Math.min(100, value))}%`, backgroundColor: color }}
@@ -792,12 +896,12 @@ function ClassButton({ onClick, icon, label, primary, danger, quiet, className =
     ? { backgroundColor: "var(--ca-accent)", borderColor: "var(--ca-accent)", color: "var(--ca-on-accent)" }
     : danger
       ? { backgroundColor: "rgba(239,68,68,0.12)", borderColor: "rgba(248,113,113,0.25)", color: "#FCA5A5" }
-      : { backgroundColor: quiet ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.12)", color: "#E2E8F0" };
+      : { backgroundColor: quiet ? "var(--cm-panel)" : "var(--cm-panel-strong)", borderColor: "var(--cm-soft-border)", color: "var(--cm-text)" };
 
   return (
     <button
       onClick={onClick}
-      className={`min-h-13 rounded-2xl border px-4 py-3 text-sm font-black transition hover:brightness-110 active:scale-[0.99] ${className}`}
+      className={`min-h-11 rounded-2xl border px-3 py-2.5 text-sm font-black transition hover:brightness-110 active:scale-[0.99] ${className}`}
       style={style}
     >
       <span className="flex items-center justify-center gap-2">{icon}{label}</span>
@@ -807,15 +911,18 @@ function ClassButton({ onClick, icon, label, primary, danger, quiet, className =
 
 function NextMomentCard({ nextSub, nextMomentLabel, isLastActivity, compact }) {
   return (
-    <div className={`rounded-3xl border border-white/10 bg-white/[0.045] ${compact ? "p-4" : "p-5"} text-left backdrop-blur-xl`}>
-      <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Próximo</p>
+    <div
+      className={`rounded-3xl border ${compact ? "p-3" : "p-5"} text-left backdrop-blur-xl`}
+      style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)" }}
+    >
+      <p className="text-xs font-black uppercase tracking-[0.25em]" style={{ color: "var(--cm-muted)" }}>Próximo</p>
       {nextSub ? (
         <div className="mt-3 flex items-start gap-3">
-          <ChevronRight className="mt-1 shrink-0 text-cyan-200" size={18} />
+          <ChevronRight className="mt-1 shrink-0" size={18} style={{ color: "var(--ca-accent)" }} />
           <div className="min-w-0">
-            <h3 className="font-black text-white">{nextMomentLabel || "Siguiente actividad"}</h3>
-            <p className="mt-0.5 text-sm text-slate-300">{displayActivityName(nextSub.name)}</p>
-            <p className="mt-1 text-xs font-bold text-slate-500">{nextSub.duration || 0} min</p>
+            <h3 className="font-black" style={{ color: "var(--cm-text)" }}>{nextMomentLabel || "Siguiente actividad"}</h3>
+            <p className="mt-0.5 text-sm" style={{ color: "var(--cm-muted)" }}>{displayActivityName(nextSub.name)}</p>
+            <p className="mt-1 text-xs font-bold" style={{ color: "var(--cm-muted)" }}>{nextSub.duration || 0} min</p>
           </div>
         </div>
       ) : (
@@ -829,27 +936,31 @@ function NextMomentCard({ nextSub, nextMomentLabel, isLastActivity, compact }) {
 
 function SessionRoute({ moments, currentMomentIdx, currentSubIdx }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 backdrop-blur-xl">
-      <p className="mb-4 text-xs font-black uppercase tracking-[0.25em] text-slate-500">Ruta de sesión</p>
+    <div className="rounded-3xl border p-5 backdrop-blur-xl" style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)" }}>
+      <p className="mb-4 text-xs font-black uppercase tracking-[0.25em]" style={{ color: "var(--cm-muted)" }}>Ruta de sesión</p>
       <div className="space-y-2">
         {moments.map((moment, momentIdx) => (
           <div
             key={moment.id || momentIdx}
             className="rounded-2xl border px-3 py-3"
             style={{
-              backgroundColor: momentIdx === currentMomentIdx ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.035)",
-              borderColor: momentIdx === currentMomentIdx ? "var(--ca-accent)" : "rgba(255,255,255,0.08)",
+              backgroundColor: momentIdx === currentMomentIdx ? "var(--cm-panel-strong)" : "var(--cm-panel)",
+              borderColor: momentIdx === currentMomentIdx ? "var(--ca-accent)" : "var(--cm-soft-border)",
             }}
           >
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: moment.color || COLORS[momentIdx % COLORS.length] }} />
-              <p className="min-w-0 flex-1 truncate text-sm font-black text-white">{moment.name}</p>
-              <span className="font-mono text-xs text-slate-500">{getMomentDuration(moment)}m</span>
+              <p className="min-w-0 flex-1 truncate text-sm font-black" style={{ color: "var(--cm-text)" }}>{moment.name}</p>
+              <span className="font-mono text-xs" style={{ color: "var(--cm-muted)" }}>{getMomentDuration(moment)}m</span>
             </div>
             {momentIdx === currentMomentIdx && (
               <div className="mt-2 space-y-1 pl-4">
                 {(moment.submoments || []).map((sub, subIdx) => (
-                  <p key={sub.id || subIdx} className={`text-xs ${subIdx === currentSubIdx ? "font-black text-cyan-100" : "text-slate-500"}`}>
+                  <p
+                    key={sub.id || subIdx}
+                    className={`text-xs ${subIdx === currentSubIdx ? "font-black" : ""}`}
+                    style={{ color: subIdx === currentSubIdx ? "var(--ca-accent)" : "var(--cm-muted)" }}
+                  >
                     {subIdx + 1}. {displayActivityName(sub.name)}
                   </p>
                 ))}
@@ -864,17 +975,20 @@ function SessionRoute({ moments, currentMomentIdx, currentSubIdx }) {
 
 function MomentChips({ moments, currentMomentIdx }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.045] p-4 text-left backdrop-blur-xl">
-      <p className="mb-3 text-xs font-black uppercase tracking-[0.25em] text-slate-500">Ruta</p>
+    <div
+      className="rounded-3xl border p-3 text-left backdrop-blur-xl"
+      style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)" }}
+    >
+      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.25em] md:text-xs" style={{ color: "var(--cm-muted)" }}>Ruta</p>
       <div className="flex flex-wrap gap-2">
         {moments.map((moment, idx) => (
           <span
             key={moment.id || idx}
-            className="rounded-full border px-3 py-2 text-xs font-black"
+            className="rounded-full border px-2.5 py-1.5 text-xs font-black"
             style={{
-              backgroundColor: idx === currentMomentIdx ? "var(--ca-accent)" : idx < currentMomentIdx ? "rgba(34,197,94,0.13)" : "rgba(255,255,255,0.05)",
-              borderColor: idx === currentMomentIdx ? "var(--ca-accent)" : "rgba(255,255,255,0.1)",
-              color: idx === currentMomentIdx ? "var(--ca-on-accent)" : idx < currentMomentIdx ? "#BBF7D0" : "#CBD5E1",
+              backgroundColor: idx === currentMomentIdx ? "var(--ca-accent)" : idx < currentMomentIdx ? "rgba(34,197,94,0.14)" : "var(--cm-panel-strong)",
+              borderColor: idx === currentMomentIdx ? "var(--ca-accent)" : idx < currentMomentIdx ? "rgba(34,197,94,0.3)" : "var(--cm-soft-border)",
+              color: idx === currentMomentIdx ? "var(--ca-on-accent)" : idx < currentMomentIdx ? "#16A34A" : "var(--cm-text)",
             }}
           >
             {moment.name} · {getMomentDuration(moment)}m
