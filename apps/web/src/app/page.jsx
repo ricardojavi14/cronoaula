@@ -127,8 +127,8 @@ export default function HomePage() {
             <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
               <a
                 href={`/class-mode/${latestSession.id}`}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white shadow-lg transition hover:brightness-110"
-                style={{ backgroundColor: "var(--ca-primary, #2563eb)" }}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black shadow-lg transition hover:brightness-110"
+                style={{ backgroundColor: "var(--ca-primary, #2563eb)", color: "var(--ca-on-accent, #fff)" }}
               >
                 <Play size={17} fill="currentColor" /> Continuar clase
               </a>
@@ -159,7 +159,7 @@ export default function HomePage() {
             Crea una sesión desde cero o importa una planificación para empezar a usar el modo clase.
           </p>
           <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
-            <a href="/create" className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white transition hover:brightness-110" style={{ backgroundColor: "var(--ca-primary,#2563eb)" }}>
+            <a href="/create" className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition hover:brightness-110" style={{ backgroundColor: "var(--ca-primary,#2563eb)", color: "var(--ca-on-accent, #fff)" }}>
               <Plus size={17} /> Crear primera sesión
             </a>
             <a href="/create?tab=import" className="inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-bold transition hover:brightness-105" style={{ borderColor: "var(--ca-border,#e2e8f0)", color: "var(--ca-text,#0f172a)" }}>
@@ -236,8 +236,8 @@ function RecentSessionRow({ session }) {
       </div>
       <a
         href={`/class-mode/${session.id}`}
-        className="inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black text-white transition hover:brightness-110 sm:shrink-0"
-        style={{ backgroundColor: "var(--ca-primary, #2563eb)" }}
+        className="inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black transition hover:brightness-110 sm:shrink-0"
+        style={{ backgroundColor: "var(--ca-primary, #2563eb)", color: "var(--ca-on-accent, #fff)" }}
       >
         <Play size={12} fill="currentColor" /> Iniciar
       </a>

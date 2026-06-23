@@ -8,7 +8,7 @@ import { Navbar } from "@/components/Navbar";
 import {
   AppSettingsProvider,
   useAppSettings,
-  THEMES,
+  resolveTheme,
   FONT_SIZES,
   DENSITIES,
 } from "@/context/AppSettingsContext";
@@ -19,27 +19,43 @@ const queryClient = new QueryClient();
 
 function ThemedApp({ children }) {
   const { settings, loaded } = useAppSettings();
-  const theme = THEMES[settings.theme] || THEMES.claro;
+  const theme = resolveTheme(settings);
   const fs = FONT_SIZES[settings.fontSize] || FONT_SIZES.normal;
   const dn = DENSITIES[settings.density] || DENSITIES.normal;
+  const fontFamily =
+    settings.fontFamily === "serif"
+      ? "Georgia, 'Times New Roman', serif"
+      : settings.fontFamily === "rounded"
+        ? "'Trebuchet MS', 'Segoe UI', system-ui, sans-serif"
+        : "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
   const cssVars = {
     "--ca-bg": theme.bg,
+    "--ca-bg-secondary": theme.bgSecondary,
     "--ca-surface": theme.surface,
+    "--ca-card": theme.card,
+    "--ca-elevated": theme.elevated,
     "--ca-text": theme.text,
     "--ca-text-muted": theme.textMuted,
     "--ca-border": theme.border,
     "--ca-nav-bg": theme.navBg,
     "--ca-nav-border": theme.navBorder,
     "--ca-nav-text": theme.navText,
-    "--ca-primary": settings.primaryColor,
+    "--ca-primary": theme.accent,
+    "--ca-accent": theme.accent,
+    "--ca-accent-soft": theme.accentSoft,
+    "--ca-on-accent": theme.onAccent,
     "--ca-secondary": settings.secondaryColor,
+    "--ca-input-bg": theme.inputBg,
+    "--ca-shadow": theme.shadow,
+    "--ca-glow": theme.glow,
     "--ca-font-base": fs.base,
     "--ca-font-heading": fs.heading,
     "--ca-timer-size": fs.timer,
     "--ca-space": dn.spacing,
     "--ca-card-pad": dn.card,
     fontSize: fs.base,
+    fontFamily,
     backgroundColor: theme.bg,
     color: theme.text,
   };

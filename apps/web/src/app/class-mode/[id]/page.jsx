@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAppSettings } from "@/context/AppSettingsContext";
+import { resolveTheme, useAppSettings } from "@/context/AppSettingsContext";
 import { getSession, saveSession, updateSubmomentStatus } from "@/utils/localStore";
 
 const COLORS = ["#22C55E", "#38BDF8", "#A78BFA", "#F59E0B", "#F43F5E"];
@@ -135,74 +135,21 @@ function getTimerClass(timerSize, large = false) {
 }
 
 function getClassModeTheme(settings) {
-  const selected = settings.classModeTheme || (settings.darkModeInClass ? "oscuro" : settings.theme) || "oscuro";
-  if (settings.highContrastMode || selected === "contraste") {
-    return {
-      key: "contrast",
-      bg: "#000000",
-      text: "#FFFFFF",
-      muted: "#FACC15",
-      panel: "rgba(255,255,255,0.06)",
-      panelStrong: "rgba(255,255,255,0.11)",
-      border: "#FACC15",
-      softBorder: "rgba(250,204,21,0.45)",
-      progressBg: "rgba(255,255,255,0.22)",
-      glow: "radial-gradient(circle at 50% 0%, rgba(250,204,21,0.18), transparent 36%)",
-    };
-  }
-  if (selected === "claro" || selected === "minimalista" || selected === "colorido") {
-    return {
-      key: "light",
-      bg: "#F8FAFC",
-      text: "#0F172A",
-      muted: "#475569",
-      panel: "rgba(255,255,255,0.76)",
-      panelStrong: "rgba(255,255,255,0.92)",
-      border: "rgba(15,23,42,0.12)",
-      softBorder: "rgba(15,23,42,0.08)",
-      progressBg: "rgba(15,23,42,0.13)",
-      glow: "radial-gradient(circle at 50% 0%, rgba(56,189,248,0.22), transparent 38%)",
-    };
-  }
-  if (selected === "calido") {
-    return {
-      key: "warm",
-      bg: "#FFF7ED",
-      text: "#3D2B1F",
-      muted: "#8A5A36",
-      panel: "rgba(255,255,255,0.62)",
-      panelStrong: "rgba(255,255,255,0.84)",
-      border: "rgba(154,89,38,0.18)",
-      softBorder: "rgba(154,89,38,0.12)",
-      progressBg: "rgba(154,89,38,0.16)",
-      glow: "radial-gradient(circle at 50% 0%, rgba(245,158,11,0.20), transparent 38%)",
-    };
-  }
-  if (selected === "imagen") {
-    return {
-      key: "image-ready",
-      bg: "#080B12",
-      text: "#F8FAFC",
-      muted: "#CBD5E1",
-      panel: "rgba(8,11,18,0.58)",
-      panelStrong: "rgba(8,11,18,0.76)",
-      border: "rgba(255,255,255,0.12)",
-      softBorder: "rgba(255,255,255,0.08)",
-      progressBg: "rgba(255,255,255,0.14)",
-      glow: "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.12), transparent 38%)",
-    };
-  }
+  const theme = resolveTheme({
+    ...settings,
+    theme: settings.highContrastMode ? "contraste" : settings.darkModeInClass ? "oscuro" : settings.theme,
+  });
   return {
-    key: "dark",
-    bg: "#070B13",
-    text: "#F8FAFC",
-    muted: "#94A3B8",
-    panel: "rgba(255,255,255,0.045)",
-    panelStrong: "rgba(255,255,255,0.07)",
-    border: "rgba(255,255,255,0.10)",
-    softBorder: "rgba(255,255,255,0.07)",
-    progressBg: "rgba(255,255,255,0.12)",
-    glow: "radial-gradient(circle at 50% 0%, rgba(56,189,248,0.18), transparent 36%), radial-gradient(circle at 80% 80%, rgba(34,197,94,0.12), transparent 36%)",
+    key: settings.theme || "oscuro",
+    bg: theme.bg,
+    text: theme.text,
+    muted: theme.textMuted,
+    panel: theme.card,
+    panelStrong: theme.elevated,
+    border: theme.border,
+    softBorder: theme.border,
+    progressBg: theme.accentSoft,
+    glow: theme.glow,
   };
 }
 
@@ -219,8 +166,9 @@ function getUrgency(timeLeft, durationSeconds) {
 export default function ClassModePage({ params }) {
   const { id } = params;
   const { settings } = useAppSettings();
-  const accent = settings.primaryColor || "#38BDF8";
-  const onAccent = readableText(accent);
+  const resolvedTheme = resolveTheme(settings);
+  const accent = resolvedTheme.accent || "#38BDF8";
+  const onAccent = resolvedTheme.onAccent || readableText(accent);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);

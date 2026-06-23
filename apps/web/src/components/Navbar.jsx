@@ -67,7 +67,7 @@ export function Navbar({ theme }) {
               className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm"
               style={{ backgroundColor: "var(--ca-primary, #2563EB)" }}
             >
-              <span className="text-white font-black text-sm">CA</span>
+              <span className="font-black text-sm" style={{ color: "var(--ca-on-accent, #fff)" }}>CA</span>
             </div>
             <span
               className="font-bold text-base tracking-tight"
@@ -96,8 +96,8 @@ export function Navbar({ theme }) {
           <a
             href={classModeHref}
             onClick={() => classModeSessionId && setLastSessionId(classModeSessionId)}
-            className="hidden sm:flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90"
-            style={{ backgroundColor: "var(--ca-primary, #2563EB)" }}
+            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90"
+            style={{ backgroundColor: "var(--ca-primary, #2563EB)", color: "var(--ca-on-accent, #fff)" }}
           >
             <Play size={14} fill="white" /> Modo clase
           </a>
@@ -117,8 +117,8 @@ export function Navbar({ theme }) {
               className="flex items-center gap-2 px-2.5 py-1.5 rounded-full hover:bg-white/10 transition-colors text-sm font-medium"
             >
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs"
-                style={{ backgroundColor: "var(--ca-primary, #2563EB)" }}
+                className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs"
+                style={{ backgroundColor: "var(--ca-primary, #2563EB)", color: "var(--ca-on-accent, #fff)" }}
               >
                 {teacher.name?.charAt(0) || "D"}
               </div>
@@ -132,8 +132,8 @@ export function Navbar({ theme }) {
           ) : (
             <a
               href="/settings"
-              className="px-3 py-1.5 text-white rounded-lg text-sm font-semibold transition-colors hover:opacity-90"
-              style={{ backgroundColor: "var(--ca-text, #1e293b)" }}
+            className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors hover:opacity-90"
+              style={{ backgroundColor: "var(--ca-primary, #2563EB)", color: "var(--ca-on-accent, #fff)" }}
             >
               Empezar
             </a>
@@ -175,8 +175,8 @@ export function Navbar({ theme }) {
               if (classModeSessionId) setLastSessionId(classModeSessionId);
               setMenuOpen(false);
             }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-white mt-2"
-            style={{ backgroundColor: "var(--ca-primary, #2563EB)" }}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold mt-2"
+            style={{ backgroundColor: "var(--ca-primary, #2563EB)", color: "var(--ca-on-accent, #fff)" }}
           >
             <Play size={15} /> Iniciar modo clase
           </a>

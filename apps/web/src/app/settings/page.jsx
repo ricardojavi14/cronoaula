@@ -14,14 +14,16 @@ import {
   Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { DEFAULT_SETTINGS, useAppSettings } from "@/context/AppSettingsContext";
+import { DEFAULT_SETTINGS, resolveTheme, THEMES, useAppSettings } from "@/context/AppSettingsContext";
 import { getTeacher, saveTeacher } from "@/utils/localStore";
 
 const THEME_OPTIONS = [
-  { value: "oscuro", label: "Oscuro" },
-  { value: "claro", label: "Claro" },
-  { value: "calido", label: "Calido" },
+  { value: "oscuro", label: "CronoAula oscuro" },
+  { value: "claro", label: "CronoAula claro" },
+  { value: "calido", label: "Aula calida" },
   { value: "contraste", label: "Alto contraste" },
+  { value: "ensena", label: "Inspirado en Enseña Peru" },
+  { value: "personalizado", label: "Personalizado" },
 ];
 
 const FONT_OPTIONS = [
@@ -69,6 +71,17 @@ function readableText(hex = "#38BDF8") {
   return luminance > 0.62 ? "#0F172A" : "#FFFFFF";
 }
 
+function contrastRatio(a = "#000000", b = "#FFFFFF") {
+  const channel = (hex, start) => {
+    const value = parseInt(String(hex).replace("#", "").slice(start, start + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = (hex) => 0.2126 * channel(hex, 0) + 0.7152 * channel(hex, 2) + 0.0722 * channel(hex, 4);
+  const l1 = luminance(a);
+  const l2 = luminance(b);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
 function buildTeacherState(settings) {
   const teacher = getTeacher();
   return {
@@ -84,9 +97,9 @@ function buildTeacherState(settings) {
 function Field({ label, hint, children }) {
   return (
     <label className="space-y-1.5">
-      <span className="block text-xs font-black uppercase tracking-[0.12em] text-slate-400">{label}</span>
+      <span className="block text-xs font-black uppercase tracking-[0.12em]" style={{ color: "var(--settings-muted)" }}>{label}</span>
       {children}
-      {hint && <span className="block text-xs text-slate-500">{hint}</span>}
+      {hint && <span className="block text-xs" style={{ color: "var(--settings-muted)" }}>{hint}</span>}
     </label>
   );
 }
@@ -95,7 +108,8 @@ function TextInput(props) {
   return (
     <input
       {...props}
-      className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-2.5 text-sm font-semibold text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/70"
+      className="w-full rounded-2xl border px-3.5 py-2.5 text-sm font-semibold outline-none transition placeholder:opacity-60 focus:brightness-105"
+      style={{ backgroundColor: "var(--settings-input)", borderColor: "var(--settings-border)", color: "var(--settings-text)" }}
     />
   );
 }
@@ -104,21 +118,22 @@ function TextArea(props) {
   return (
     <textarea
       {...props}
-      className="min-h-24 w-full resize-y rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-2.5 text-sm font-semibold leading-relaxed text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/70"
+      className="min-h-24 w-full resize-y rounded-2xl border px-3.5 py-2.5 text-sm font-semibold leading-relaxed outline-none transition placeholder:opacity-60 focus:brightness-105"
+      style={{ backgroundColor: "var(--settings-input)", borderColor: "var(--settings-border)", color: "var(--settings-text)" }}
     />
   );
 }
 
 function Section({ icon, title, subtitle, children }) {
   return (
-    <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4 shadow-xl shadow-black/15 backdrop-blur-xl">
+    <section className="rounded-[1.5rem] border p-4 shadow-xl backdrop-blur-xl" style={{ backgroundColor: "var(--settings-card)", borderColor: "var(--settings-border)" }}>
       <div className="mb-4 flex items-start gap-3">
-        <div className="rounded-2xl bg-white/[0.07] p-2.5" style={{ color: "var(--settings-accent)" }}>
+        <div className="rounded-2xl p-2.5" style={{ backgroundColor: "var(--ca-accent-soft, rgba(56,189,248,0.16))", color: "var(--settings-accent)" }}>
           {icon}
         </div>
         <div className="min-w-0">
-          <h2 className="text-base font-black text-white">{title}</h2>
-          {subtitle && <p className="text-sm text-slate-400">{subtitle}</p>}
+          <h2 className="text-base font-black" style={{ color: "var(--settings-text)" }}>{title}</h2>
+          {subtitle && <p className="text-sm" style={{ color: "var(--settings-muted)" }}>{subtitle}</p>}
         </div>
       </div>
       {children}
@@ -138,9 +153,9 @@ function Segmented({ value, onChange, options, columns = "sm:grid-cols-2" }) {
             onClick={() => onChange(option.value)}
             className="rounded-2xl border px-3 py-2 text-sm font-black transition hover:brightness-110"
             style={{
-              backgroundColor: active ? "var(--settings-accent)" : "rgba(255,255,255,0.05)",
-              borderColor: active ? "var(--settings-accent)" : "rgba(255,255,255,0.1)",
-              color: active ? "var(--settings-on-accent)" : "#CBD5E1",
+              backgroundColor: active ? "var(--settings-accent)" : "var(--settings-elevated)",
+              borderColor: active ? "var(--settings-accent)" : "var(--settings-border)",
+              color: active ? "var(--settings-on-accent)" : "var(--settings-text)",
             }}
           >
             {option.label}
@@ -156,11 +171,12 @@ function Toggle({ checked, onChange, label, hint }) {
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-3.5 py-3 text-left transition hover:bg-white/[0.075]"
+      className="flex w-full items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-left transition hover:brightness-105"
+      style={{ backgroundColor: "var(--settings-elevated)", borderColor: "var(--settings-border)" }}
     >
       <span className="min-w-0">
-        <span className="block text-sm font-black text-white">{label}</span>
-        {hint && <span className="block text-xs text-slate-500">{hint}</span>}
+        <span className="block text-sm font-black" style={{ color: "var(--settings-text)" }}>{label}</span>
+        {hint && <span className="block text-xs" style={{ color: "var(--settings-muted)" }}>{hint}</span>}
       </span>
       <span className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: checked ? "var(--settings-accent)" : "#334155" }}>
         <span className="absolute top-1 h-4 w-4 rounded-full bg-white shadow transition" style={{ left: checked ? "23px" : "4px" }} />
@@ -172,15 +188,26 @@ function Toggle({ checked, onChange, label, hint }) {
 export default function SettingsPage() {
   const { settings, setSettings, resetSettings } = useAppSettings();
   const [teacher, setTeacher] = useState(() => buildTeacherState(settings));
-  const accent = settings.primaryColor || "#38BDF8";
+  const previewTheme = resolveTheme(settings);
+  const accent = previewTheme.accent || settings.primaryColor || "#38BDF8";
   const onAccent = readableText(accent);
+  const customContrastLow =
+    settings.theme === "personalizado" &&
+    contrastRatio(settings.customTheme?.bg || "#070B13", settings.customTheme?.text || "#F8FAFC") < 4.5;
 
   const rootStyle = useMemo(
     () => ({
       "--settings-accent": accent,
       "--settings-on-accent": onAccent,
+      "--settings-bg": previewTheme.bg,
+      "--settings-card": previewTheme.card,
+      "--settings-elevated": previewTheme.elevated,
+      "--settings-text": previewTheme.text,
+      "--settings-muted": previewTheme.textMuted,
+      "--settings-border": previewTheme.border,
+      "--settings-input": previewTheme.inputBg,
     }),
-    [accent, onAccent],
+    [accent, onAccent, previewTheme],
   );
 
   useEffect(() => {
@@ -196,6 +223,20 @@ export default function SettingsPage() {
 
   const updateSetting = (key, value) => setSettings({ [key]: value });
   const updateTeacher = (key, value) => setTeacher((prev) => ({ ...prev, [key]: value }));
+  const updateTheme = (value) => {
+    const preset = THEMES[value];
+    setSettings({
+      theme: value,
+      primaryColor: value === "personalizado" ? settings.customTheme?.accent || accent : preset?.accent || accent,
+    });
+  };
+  const updateAccent = (value) => {
+    if (settings.theme === "personalizado") {
+      setSettings({ customTheme: { accent: value }, primaryColor: value });
+      return;
+    }
+    updateSetting("primaryColor", value);
+  };
 
   const handleSave = () => {
     try {
@@ -252,20 +293,20 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#070B13] px-4 py-5 text-white md:px-6" style={rootStyle}>
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(56,189,248,0.16),transparent_34%),radial-gradient(circle_at_100%_100%,rgba(34,197,94,0.10),transparent_34%)]" />
+    <div className="min-h-[calc(100vh-4rem)] px-4 py-5 md:px-6" style={{ ...rootStyle, backgroundColor: previewTheme.bg, color: previewTheme.text }}>
+      <div className="pointer-events-none fixed inset-0" style={{ background: previewTheme.glow }} />
       <div className="relative mx-auto max-w-6xl space-y-5">
-        <header className="rounded-[1.75rem] border border-white/10 bg-white/[0.045] p-5 shadow-xl shadow-black/20 backdrop-blur-xl">
+        <header className="rounded-[1.75rem] border p-5 shadow-xl backdrop-blur-xl" style={{ backgroundColor: previewTheme.card, borderColor: previewTheme.border, boxShadow: previewTheme.shadow }}>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.26em]" style={{ color: "var(--settings-accent)" }}>Configuracion</p>
-              <h1 className="mt-1 text-3xl font-black">Ajustes de CronoAula</h1>
-              <p className="mt-1 max-w-2xl text-sm text-slate-400">
+              <h1 className="mt-1 text-3xl font-black" style={{ color: previewTheme.text }}>Ajustes de CronoAula</h1>
+              <p className="mt-1 max-w-2xl text-sm" style={{ color: previewTheme.textMuted }}>
                 Perfil, apariencia y modo clase guardados en este navegador. Sin servidor, sin conexion externa.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={handleReset} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-2.5 text-sm font-black text-slate-300 transition hover:bg-white/10">
+              <button onClick={handleReset} className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-black transition hover:brightness-105" style={{ borderColor: previewTheme.border, color: previewTheme.text, backgroundColor: previewTheme.elevated }}>
                 <RotateCcw size={16} /> Restaurar
               </button>
               <button onClick={handleSave} className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-black shadow-sm transition hover:brightness-110" style={{ backgroundColor: "var(--settings-accent)", color: "var(--settings-on-accent)" }}>
@@ -304,23 +345,50 @@ export default function SettingsPage() {
           <Section icon={<Palette size={20} />} title="Apariencia" subtitle="Acentos seguros y lectura clara.">
             <div className="space-y-4">
               <Field label="Tema visual">
-                <Segmented value={settings.theme || "oscuro"} onChange={(value) => updateSetting("theme", value)} options={THEME_OPTIONS} columns="sm:grid-cols-4" />
+                <Segmented value={settings.theme || "oscuro"} onChange={updateTheme} options={THEME_OPTIONS} columns="sm:grid-cols-2 lg:grid-cols-3" />
               </Field>
+              <p className="rounded-2xl border px-3 py-2 text-xs font-semibold" style={{ borderColor: previewTheme.border, color: previewTheme.textMuted, backgroundColor: previewTheme.elevated }}>
+                {THEMES[settings.theme]?.label || "Tema personalizado"} cambia fondos, navbar, tarjetas, bordes, textos y acentos de forma coordinada.
+              </p>
               <Field label="Color de acento">
                 <div className="flex flex-wrap items-center gap-2">
                   {COLOR_OPTIONS.map((color) => (
                     <button
                       key={color}
                       type="button"
-                      onClick={() => updateSetting("primaryColor", color)}
+                      onClick={() => updateAccent(color)}
                       className="h-9 w-9 rounded-2xl border-2 transition hover:scale-105"
                       style={{ backgroundColor: color, borderColor: settings.primaryColor === color ? "#FFFFFF" : "rgba(255,255,255,0.14)" }}
                       aria-label={`Usar color ${color}`}
                     />
                   ))}
-                  <input type="color" value={accent} onChange={(event) => updateSetting("primaryColor", event.target.value)} className="h-9 w-14 rounded-xl border border-white/10 bg-white/10 p-1" />
+                  <input type="color" value={accent} onChange={(event) => updateAccent(event.target.value)} className="h-9 w-14 rounded-xl border border-white/10 bg-white/10 p-1" />
                 </div>
               </Field>
+              {settings.theme === "personalizado" && (
+                <div className="grid gap-3 rounded-2xl border p-3 sm:grid-cols-2" style={{ borderColor: previewTheme.border, backgroundColor: previewTheme.elevated }}>
+                  <Field label="Fondo">
+                    <TextInput type="color" value={settings.customTheme?.bg || "#070B13"} onChange={(event) => updateSetting("customTheme", { bg: event.target.value })} />
+                  </Field>
+                  <Field label="Superficie / tarjeta">
+                    <TextInput type="color" value={settings.customTheme?.surface || "#101827"} onChange={(event) => updateSetting("customTheme", { surface: event.target.value, card: event.target.value, elevated: event.target.value })} />
+                  </Field>
+                  <Field label="Acento">
+                    <TextInput type="color" value={settings.customTheme?.accent || "#38BDF8"} onChange={(event) => updateSetting("customTheme", { accent: event.target.value })} />
+                  </Field>
+                  <Field label="Texto principal">
+                    <TextInput type="color" value={settings.customTheme?.text || "#F8FAFC"} onChange={(event) => updateSetting("customTheme", { text: event.target.value })} />
+                  </Field>
+                  <p className="sm:col-span-2 text-xs font-semibold" style={{ color: previewTheme.textMuted }}>
+                    Si el acento es claro u oscuro, CronoAula calcula automaticamente el texto del boton para conservar contraste.
+                  </p>
+                  {customContrastLow && (
+                    <p className="sm:col-span-2 rounded-xl border px-3 py-2 text-xs font-black" style={{ borderColor: "#F59E0B", backgroundColor: "rgba(245,158,11,0.14)", color: "#F59E0B" }}>
+                      El contraste entre fondo y texto es bajo. Ajusta uno de los dos para una lectura mas segura.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="grid gap-3 sm:grid-cols-3">
                 <Field label="Letra">
                   <Segmented value={settings.fontSize || "normal"} onChange={(value) => updateSetting("fontSize", value)} options={FONT_OPTIONS} columns="" />
@@ -368,7 +436,7 @@ export default function SettingsPage() {
               <Field label="Volumen">
                 <Segmented value={settings.alertVolume || "medio"} onChange={(value) => updateSetting("alertVolume", value)} options={VOLUME_OPTIONS} />
               </Field>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-3 text-sm text-slate-400">
+              <div className="rounded-2xl border p-3 text-sm" style={{ borderColor: previewTheme.border, backgroundColor: previewTheme.elevated, color: previewTheme.textMuted }}>
                 <Volume2 className="mr-2 inline" size={16} /> Estos ajustes quedan guardados; la logica sonora completa puede conectarse despues.
               </div>
             </div>
@@ -384,16 +452,32 @@ export default function SettingsPage() {
           </Section>
 
           <Section icon={<Timer size={20} />} title="Vista previa" subtitle="Lectura segura con el acento elegido.">
-            <div className="rounded-[1.75rem] border border-white/10 bg-black/35 p-5 text-center">
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Modo clase</p>
-              <h3 className="mt-2 text-3xl font-black text-white">Desarrollo</h3>
-              <div className="mt-5 font-mono text-6xl font-black leading-none text-emerald-400">12:00</div>
-              <p className="mt-3 text-sm text-slate-400">Actividad de aprendizaje clara y visible.</p>
-              <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full" style={{ width: "62%", backgroundColor: accent }} />
+            <div className="overflow-hidden rounded-[1.75rem] border text-left" style={{ backgroundColor: previewTheme.bg, borderColor: previewTheme.border, color: previewTheme.text }}>
+              <div className="flex items-center justify-between border-b px-4 py-3" style={{ backgroundColor: previewTheme.navBg, borderColor: previewTheme.navBorder, color: previewTheme.navText }}>
+                <div className="font-black">CronoAula</div>
+                <div className="rounded-full px-3 py-1 text-xs font-black" style={{ backgroundColor: previewTheme.accent, color: previewTheme.onAccent }}>Modo clase</div>
               </div>
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black" style={{ backgroundColor: accent, color: onAccent }}>
-                <Check size={14} /> Acento seguro
+              <div className="p-4">
+                <div className="rounded-3xl border p-4" style={{ backgroundColor: previewTheme.card, borderColor: previewTheme.border, boxShadow: previewTheme.shadow }}>
+                  <p className="text-xs font-black uppercase tracking-[0.22em]" style={{ color: previewTheme.textMuted }}>Mini tarjeta de sesion</p>
+                  <h3 className="mt-2 text-xl font-black" style={{ color: previewTheme.text }}>Fracciones equivalentes</h3>
+                  <p className="mt-1 text-sm" style={{ color: previewTheme.textMuted }}>Comunicacion · 5to · 45 min</p>
+                  <button className="mt-4 rounded-2xl px-4 py-2 text-sm font-black" style={{ backgroundColor: previewTheme.accent, color: previewTheme.onAccent }}>
+                    Boton principal
+                  </button>
+                </div>
+                <div className="mt-4 rounded-3xl border p-5 text-center" style={{ backgroundColor: previewTheme.elevated, borderColor: previewTheme.border }}>
+                  <p className="text-xs font-black uppercase tracking-[0.25em]" style={{ color: previewTheme.textMuted }}>Modo clase</p>
+                  <h3 className="mt-2 text-3xl font-black" style={{ color: previewTheme.text }}>Desarrollo</h3>
+                  <div className="mt-5 font-mono text-6xl font-black leading-none text-emerald-400">12:00</div>
+                  <p className="mt-3 text-sm" style={{ color: previewTheme.textMuted }}>Actividad de aprendizaje clara y visible.</p>
+                  <div className="mt-4 h-2.5 overflow-hidden rounded-full" style={{ backgroundColor: previewTheme.accentSoft }}>
+                    <div className="h-full rounded-full" style={{ width: "62%", backgroundColor: previewTheme.accent }} />
+                  </div>
+                  <div className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black" style={{ backgroundColor: previewTheme.accent, color: previewTheme.onAccent }}>
+                    <Check size={14} /> Contraste seguro
+                  </div>
+                </div>
               </div>
             </div>
           </Section>

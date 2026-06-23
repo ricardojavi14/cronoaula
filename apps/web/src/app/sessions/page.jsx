@@ -153,34 +153,35 @@ export default function SessionsPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-sm text-slate-400">Cargando tus sesiones...</p>
+        <p className="text-sm" style={{ color: "var(--ca-text-muted)" }}>Cargando tus sesiones...</p>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 pb-14">
-      <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#070B13] p-5 text-white shadow-2xl sm:p-6">
-        <div className="pointer-events-none absolute inset-x-0 top-14 -z-10 h-72 bg-[radial-gradient(circle_at_50%_0%,rgba(56,189,248,0.18),transparent_42%)]" />
+      <section className="overflow-hidden rounded-[2rem] border p-5 shadow-2xl sm:p-6" style={{ backgroundColor: "var(--ca-card)", borderColor: "var(--ca-border)", color: "var(--ca-text)", boxShadow: "var(--ca-shadow)" }}>
+        <div className="pointer-events-none absolute inset-x-0 top-14 -z-10 h-72" style={{ background: "var(--ca-glow)" }} />
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.26em] text-slate-500">Biblioteca de aula</p>
+            <p className="text-xs font-black uppercase tracking-[0.26em]" style={{ color: "var(--ca-text-muted)" }}>Biblioteca de aula</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Mis sesiones</h1>
-            <p className="mt-1 max-w-2xl text-sm text-slate-400">
+            <p className="mt-1 max-w-2xl text-sm" style={{ color: "var(--ca-text-muted)" }}>
               Encuentra una sesion, inicia clase y sigue el ritmo sin pantallas intermedias pesadas.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <a
               href="/create?tab=import"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-bold text-slate-100 transition hover:bg-white/[0.1]"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold transition hover:brightness-105"
+              style={{ backgroundColor: "var(--ca-elevated)", borderColor: "var(--ca-border)", color: "var(--ca-text)" }}
             >
               <Sparkles size={16} /> Importar planificacion
             </a>
             <a
               href="/create"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black text-white shadow-lg transition hover:brightness-110"
-              style={{ backgroundColor: "var(--ca-primary, #38BDF8)" }}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black shadow-lg transition hover:brightness-110"
+              style={{ backgroundColor: "var(--ca-primary, #38BDF8)", color: "var(--ca-on-accent, #fff)" }}
             >
               <Plus size={16} /> Nueva sesion
             </a>
@@ -189,11 +190,12 @@ export default function SessionsPage() {
 
         <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2" size={16} style={{ color: "var(--ca-text-muted)" }} />
             <input
               type="text"
               placeholder="Buscar por titulo, area, grado o fecha..."
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.06] py-3 pl-10 pr-4 text-sm font-semibold text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/60"
+              className="w-full rounded-2xl border py-3 pl-10 pr-4 text-sm font-semibold outline-none placeholder:opacity-60 focus:brightness-105"
+              style={{ backgroundColor: "var(--ca-input-bg)", borderColor: "var(--ca-border)", color: "var(--ca-text)" }}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -205,9 +207,9 @@ export default function SessionsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className="shrink-0 rounded-full border px-3 py-2 text-xs font-black transition"
                 style={{
-                  backgroundColor: activeTab === tab.id ? "var(--ca-primary, #38BDF8)" : "rgba(255,255,255,0.05)",
-                  borderColor: activeTab === tab.id ? "var(--ca-primary, #38BDF8)" : "rgba(255,255,255,0.1)",
-                  color: activeTab === tab.id ? "#07111F" : "#CBD5E1",
+                  backgroundColor: activeTab === tab.id ? "var(--ca-primary, #38BDF8)" : "var(--ca-elevated)",
+                  borderColor: activeTab === tab.id ? "var(--ca-primary, #38BDF8)" : "var(--ca-border)",
+                  color: activeTab === tab.id ? "var(--ca-on-accent, #07111F)" : "var(--ca-text)",
                 }}
               >
                 {tab.label}
@@ -218,15 +220,15 @@ export default function SessionsPage() {
       </section>
 
       {filteredSessions.length > 0 ? (
-        <section className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#0B1020] text-white shadow-xl">
-          <div className="hidden grid-cols-[minmax(220px,1.6fr)_minmax(180px,0.9fr)_120px_120px_220px] gap-4 border-b border-white/10 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 xl:grid">
+        <section className="overflow-hidden rounded-[1.5rem] border shadow-xl" style={{ backgroundColor: "var(--ca-card)", borderColor: "var(--ca-border)", color: "var(--ca-text)" }}>
+          <div className="hidden grid-cols-[minmax(220px,1.6fr)_minmax(180px,0.9fr)_120px_120px_220px] gap-4 border-b px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] xl:grid" style={{ borderColor: "var(--ca-border)", color: "var(--ca-text-muted)" }}>
             <span>Sesion</span>
             <span>Datos</span>
             <span>Duracion</span>
             <span>Momentos</span>
             <span className="text-right">Accion</span>
           </div>
-          <div className="divide-y divide-white/10">
+          <div className="divide-y" style={{ borderColor: "var(--ca-border)" }}>
             {filteredSessions.map((session) => (
               <SessionRow
                 key={session.id}
@@ -252,48 +254,49 @@ function SessionRow({ session, onDelete, onDuplicate, onExport }) {
   const classHref = `/class-mode/${session.id}`;
 
   return (
-    <article className="grid gap-3 px-4 py-4 transition hover:bg-white/[0.035] md:grid-cols-[minmax(0,1fr)_auto] md:items-center xl:grid-cols-[minmax(220px,1.6fr)_minmax(180px,0.9fr)_120px_120px_220px] xl:gap-4">
+    <article className="grid gap-3 px-4 py-4 transition hover:brightness-[1.03] md:grid-cols-[minmax(0,1fr)_auto] md:items-center xl:grid-cols-[minmax(220px,1.6fr)_minmax(180px,0.9fr)_120px_120px_220px] xl:gap-4">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--ca-primary, #38BDF8)" }} />
-          <h2 className="line-clamp-2 min-w-0 text-base font-black leading-snug text-white xl:truncate xl:whitespace-nowrap">{session.title || "Sesion sin titulo"}</h2>
+          <h2 className="line-clamp-2 min-w-0 text-base font-black leading-snug xl:truncate xl:whitespace-nowrap" style={{ color: "var(--ca-text)" }}>{session.title || "Sesion sin titulo"}</h2>
         </div>
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+        <p className="mt-1 flex items-center gap-1.5 text-xs" style={{ color: "var(--ca-text-muted)" }}>
           <Calendar size={12} /> {formatDate(session)}
         </p>
       </div>
 
-      <div className="flex min-w-0 flex-wrap gap-2 text-xs font-bold text-slate-300 md:col-span-2 xl:col-span-1 xl:block xl:space-y-1">
-        <span className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 xl:inline-block">{session.area || "Sin area"}</span>
-        <span className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 xl:inline-block xl:ml-1">{session.grade || "Sin grado"}</span>
+      <div className="flex min-w-0 flex-wrap gap-2 text-xs font-bold md:col-span-2 xl:col-span-1 xl:block xl:space-y-1" style={{ color: "var(--ca-text)" }}>
+        <span className="max-w-full truncate rounded-full border px-2 py-1 xl:inline-block" style={{ backgroundColor: "var(--ca-elevated)", borderColor: "var(--ca-border)" }}>{session.area || "Sin area"}</span>
+        <span className="max-w-full truncate rounded-full border px-2 py-1 xl:inline-block xl:ml-1" style={{ backgroundColor: "var(--ca-elevated)", borderColor: "var(--ca-border)" }}>{session.grade || "Sin grado"}</span>
       </div>
 
-      <div className="flex items-center gap-2 text-sm font-bold text-slate-300 md:col-span-1 xl:col-span-1">
-        <Clock size={15} className="text-slate-500" /> {formatDuration(duration)}
+      <div className="flex items-center gap-2 text-sm font-bold md:col-span-1 xl:col-span-1" style={{ color: "var(--ca-text)" }}>
+        <Clock size={15} style={{ color: "var(--ca-text-muted)" }} /> {formatDuration(duration)}
       </div>
 
-      <div className="flex items-center gap-2 text-sm font-bold text-slate-300 md:col-span-1 xl:col-span-1">
-        <Layers size={15} className="text-slate-500" /> {momentCount || "Sin"} momentos
+      <div className="flex items-center gap-2 text-sm font-bold md:col-span-1 xl:col-span-1" style={{ color: "var(--ca-text)" }}>
+        <Layers size={15} style={{ color: "var(--ca-text-muted)" }} /> {momentCount || "Sin"} momentos
       </div>
 
       <div className="relative flex min-w-[210px] items-center gap-2 md:row-start-1 md:justify-end xl:row-auto">
         <a
           href={classHref}
           onClick={() => setLastSessionId(session.id)}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 py-2.5 text-xs font-black text-white transition hover:brightness-110 md:flex-none"
-          style={{ backgroundColor: "var(--ca-primary, #38BDF8)" }}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 py-2.5 text-xs font-black transition hover:brightness-110 md:flex-none"
+          style={{ backgroundColor: "var(--ca-primary, #38BDF8)", color: "var(--ca-on-accent, #fff)" }}
         >
           <Play size={13} fill="currentColor" /> Iniciar clase
         </a>
         <button
           onClick={() => setMenuOpen((value) => !value)}
-          className="rounded-full border border-white/10 p-2.5 text-slate-400 transition hover:bg-white/[0.08] hover:text-white"
+          className="rounded-full border p-2.5 transition hover:brightness-110"
+          style={{ borderColor: "var(--ca-border)", color: "var(--ca-text-muted)", backgroundColor: "var(--ca-elevated)" }}
           title="Mas acciones"
         >
           <MoreVertical size={15} />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-12 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-[#111827] p-1.5 shadow-2xl">
+          <div className="absolute right-0 top-12 z-20 w-44 overflow-hidden rounded-2xl border p-1.5 shadow-2xl" style={{ backgroundColor: "var(--ca-elevated)", borderColor: "var(--ca-border)" }}>
             <ActionLink href={`/create?id=${session.id}`} icon={<Edit3 size={14} />} label="Editar" />
             <ActionButton onClick={() => { onDuplicate(session); setMenuOpen(false); }} icon={<Copy size={14} />} label="Duplicar" />
             <ActionButton onClick={() => { onExport(session.id); setMenuOpen(false); }} icon={<Download size={14} />} label="Exportar" />
@@ -307,7 +310,7 @@ function SessionRow({ session, onDelete, onDuplicate, onExport }) {
 
 function ActionLink({ href, icon, label }) {
   return (
-    <a href={href} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/[0.08]">
+    <a href={href} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition hover:brightness-110" style={{ color: "var(--ca-text)" }}>
       {icon} {label}
     </a>
   );
@@ -317,7 +320,8 @@ function ActionButton({ onClick, icon, label, danger }) {
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-bold transition hover:bg-white/[0.08] ${danger ? "text-red-300" : "text-slate-200"}`}
+      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-bold transition hover:brightness-110"
+      style={{ color: danger ? "#FCA5A5" : "var(--ca-text)" }}
     >
       {icon} {label}
     </button>
@@ -334,14 +338,14 @@ function EmptyState({ activeTab, searchTerm }) {
   };
 
   return (
-    <section className="rounded-[2rem] border border-white/10 bg-[#0B1020] p-8 text-center text-white shadow-xl">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-slate-300">
+    <section className="rounded-[2rem] border p-8 text-center shadow-xl" style={{ backgroundColor: "var(--ca-card)", borderColor: "var(--ca-border)", color: "var(--ca-text)" }}>
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border" style={{ backgroundColor: "var(--ca-elevated)", borderColor: "var(--ca-border)", color: "var(--ca-text-muted)" }}>
         {activeTab === "archived" ? <Archive size={25} /> : <FileText size={25} />}
       </div>
       <h2 className="mt-4 text-2xl font-black">
         {isSearch ? "Sin resultados" : copy[activeTab]}
       </h2>
-      <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
+      <p className="mx-auto mt-2 max-w-md text-sm" style={{ color: "var(--ca-text-muted)" }}>
         {isSearch
           ? "Prueba buscando por titulo, area, grado o fecha."
           : activeTab === "templates" || activeTab === "archived"
@@ -350,10 +354,10 @@ function EmptyState({ activeTab, searchTerm }) {
       </p>
       {!isSearch && (activeTab === "recent" || activeTab === "all") && (
         <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
-          <a href="/create" className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-white transition hover:brightness-110" style={{ backgroundColor: "var(--ca-primary, #38BDF8)" }}>
+          <a href="/create" className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition hover:brightness-110" style={{ backgroundColor: "var(--ca-primary, #38BDF8)", color: "var(--ca-on-accent, #fff)" }}>
             <Plus size={17} /> Crear sesion
           </a>
-          <a href="/create?tab=import" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3 text-sm font-bold text-slate-100 transition hover:bg-white/[0.1]">
+          <a href="/create?tab=import" className="inline-flex items-center justify-center gap-2 rounded-2xl border px-5 py-3 text-sm font-bold transition hover:brightness-105" style={{ backgroundColor: "var(--ca-elevated)", borderColor: "var(--ca-border)", color: "var(--ca-text)" }}>
             <Sparkles size={17} /> Importar planificacion
           </a>
         </div>
