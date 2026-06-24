@@ -18,6 +18,7 @@ import {
   ArrowLeft,
   Layers,
   BookOpen,
+  Play,
   Zap,
   RotateCcw,
   FileText,
@@ -412,7 +413,7 @@ export default function CreateSessionPage() {
       ),
     );
 
-  const saveActiveSession = async ({ goToClass = false } = {}) => {
+  const saveActiveSession = async ({ goToClass = false, testMode = false } = {}) => {
     if (!String(activeMeta.title || "").trim())
       return toast.error("El titulo es obligatorio");
     if (!activeMoments.length)
@@ -427,7 +428,7 @@ export default function CreateSessionPage() {
       if (typeof window !== "undefined") localStorage.removeItem("cronoaula_draft");
       toast.success("Sesión guardada en este dispositivo");
       setTimeout(() => {
-        window.location.href = goToClass ? `/class-mode/${saved.id}` : "/sessions";
+        window.location.href = goToClass ? `/class-mode/${saved.id}${testMode ? "?test=1" : ""}` : "/sessions";
       }, 500);
       return saved;
     } catch (error) {
@@ -441,6 +442,7 @@ export default function CreateSessionPage() {
 
   const handleSave = async () => saveActiveSession();
   const handleTryClass = async () => saveActiveSession({ goToClass: true });
+  const handleTestClass = async () => saveActiveSession({ goToClass: true, testMode: true });
 
   const handleAnalyze = async () => {
     if (!iTxt.trim()) return toast.error("Pega el texto de tu planificación");
@@ -1247,6 +1249,7 @@ export default function CreateSessionPage() {
           saving={saving}
           onSave={handleSave}
           onTryClass={handleTryClass}
+          onTestClass={handleTestClass}
           onRedistribute={isPreviewing ? null : redis}
         />
       </div>
@@ -1269,13 +1272,22 @@ export default function CreateSessionPage() {
               </button>
             )}
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl font-bold text-sm transition-colors shadow-sm"
-          >
-            <Save size={15} /> {saving ? "Guardando..." : "Guardar sesión"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTestClass}
+              disabled={saving}
+              className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-sm transition-colors"
+            >
+              <Play size={15} /> Probar sesión
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl font-bold text-sm transition-colors shadow-sm"
+            >
+              <Save size={15} /> {saving ? "Guardando..." : "Guardar sesión"}
+            </button>
+          </div>
         </div>
       </div>
       <style
@@ -1291,6 +1303,7 @@ function SessionReviewPanel({
   saving,
   onSave,
   onTryClass,
+  onTestClass,
   onRedistribute,
 }) {
   const status =
@@ -1404,6 +1417,13 @@ function SessionReviewPanel({
             className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-slate-900 text-white rounded-xl text-sm font-black transition-colors"
           >
             <BookOpen size={15} /> Ver en modo clase
+          </button>
+          <button
+            onClick={onTestClass}
+            disabled={saving || !review.canSave}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-black transition-colors"
+          >
+            <Play size={15} /> Probar sesión
           </button>
         </div>
       </div>

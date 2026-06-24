@@ -280,6 +280,13 @@ function SessionRow({ session, onDelete, onDuplicate, onExport }) {
 
       <div className="relative flex min-w-[210px] items-center gap-2 md:row-start-1 md:justify-end xl:row-auto">
         <a
+          href={`${classHref}?test=1`}
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-black transition hover:brightness-110"
+          style={{ borderColor: "var(--ca-border)", backgroundColor: "var(--ca-elevated)", color: "var(--ca-text)" }}
+        >
+          Probar
+        </a>
+        <a
           href={classHref}
           onClick={() => setLastSessionId(session.id)}
           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 py-2.5 text-xs font-black transition hover:brightness-110 md:flex-none"

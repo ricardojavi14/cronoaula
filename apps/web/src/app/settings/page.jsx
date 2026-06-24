@@ -59,6 +59,13 @@ const VOLUME_OPTIONS = [
   { value: "medio", label: "Medio" },
 ];
 
+const TEST_SPEED_OPTIONS = [
+  { value: 1, label: "Tiempo real x1" },
+  { value: 5, label: "Rápido x5" },
+  { value: 10, label: "Muy rápido x10" },
+  { value: 30, label: "Demo x30" },
+];
+
 const COLOR_OPTIONS = ["#38BDF8", "#22C55E", "#A78BFA", "#F59E0B", "#F43F5E", "#14B8A6", "#E879F9", "#F8FAFC"];
 
 function readableText(hex = "#38BDF8") {
@@ -411,6 +418,9 @@ export default function SettingsPage() {
                 </Field>
                 <Field label="Temporizador">
                   <Segmented value={settings.timerSize || "grande"} onChange={(value) => updateSetting("timerSize", value)} options={TIMER_OPTIONS} />
+                </Field>
+                <Field label="Velocidad de prueba">
+                  <Segmented value={Number(settings.testSpeed) || 10} onChange={(value) => updateSetting("testSpeed", Number(value))} options={TEST_SPEED_OPTIONS} />
                 </Field>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">

@@ -24,6 +24,12 @@ import { resolveTheme, useAppSettings } from "@/context/AppSettingsContext";
 import { getSession, saveSession, updateSubmomentStatus } from "@/utils/localStore";
 
 const COLORS = ["#22C55E", "#38BDF8", "#A78BFA", "#F59E0B", "#F43F5E"];
+const TEST_SPEEDS = [
+  { value: 1, label: "Tiempo real x1" },
+  { value: 5, label: "Rápido x5" },
+  { value: 10, label: "Muy rápido x10" },
+  { value: 30, label: "Demo x30" },
+];
 
 function toSeconds(minutes = 0) {
   return Math.max(0, Math.round((Number(minutes) || 0) * 60));
@@ -165,7 +171,7 @@ function getUrgency(timeLeft, durationSeconds) {
 
 export default function ClassModePage({ params }) {
   const { id } = params;
-  const { settings } = useAppSettings();
+  const { settings, setSettings } = useAppSettings();
   const resolvedTheme = resolveTheme(settings);
   const accent = resolvedTheme.accent || "#38BDF8";
   const onAccent = resolvedTheme.onAccent || readableText(accent);
@@ -183,13 +189,23 @@ export default function ClassModePage({ params }) {
   const [fullscreenMode, setFullscreenMode] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [showLateStart, setShowLateStart] = useState(false);
+  const [testMode, setTestMode] = useState(false);
+  const [simulationSpeed, setSimulationSpeed] = useState(Number(settings.testSpeed) || 10);
+  const [testScope, setTestScope] = useState("session");
+  const [showPrepare, setShowPrepare] = useState(false);
+  const [prepareFullscreen, setPrepareFullscreen] = useState(Boolean(settings.prepareFullscreen));
   const [lateMode, setLateMode] = useState("delay");
   const [lateMinutes, setLateMinutes] = useState(10);
   const [remainingMinutesInput, setRemainingMinutesInput] = useState(45);
   const timerRef = useRef(null);
+  const previousTimeRef = useRef(0);
 
   useEffect(() => {
     try {
+      const search = new URLSearchParams(window.location.search);
+      const isTest = search.get("test") === "1";
+      const speed = Number(search.get("speed") || settings.testSpeed || 10);
+      const startMoment = Math.max(0, Number(search.get("moment") || 0));
       const data = getSession(id);
       if (!data) {
         toast.error("No encontré la sesión en este dispositivo");
@@ -215,15 +231,21 @@ export default function ClassModePage({ params }) {
         })),
       };
       setSession(normalized);
-      setTimeLeft(toSeconds(normalized.moments?.[0]?.submoments?.[0]?.duration || 0));
+      const safeMoment = Math.min(startMoment, Math.max(0, (normalized.moments?.length || 1) - 1));
+      setTestMode(isTest);
+      setSimulationSpeed([1, 5, 10, 30].includes(speed) ? speed : 10);
+      setCurrentMomentIdx(safeMoment);
+      setCurrentSubIdx(0);
+      setTimeLeft(toSeconds(normalized.moments?.[safeMoment]?.submoments?.[0]?.duration || 0));
       setRemainingMinutesInput(Math.ceil(getTotalSeconds(normalized.moments) / 60));
+      setShowPrepare(!isTest);
     } catch (error) {
       console.error(error);
       toast.error("No se pudo cargar el modo clase");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, settings.testSpeed]);
 
   const moments = session?.moments || [];
   const currentMoment = moments[currentMomentIdx] || {};
@@ -251,19 +273,54 @@ export default function ClassModePage({ params }) {
   useEffect(() => {
     if (!isActive || showSummary) return;
     timerRef.current = setInterval(() => {
+      const step = testMode ? simulationSpeed : 1;
       setTimeLeft((prev) => {
-        if (prev <= 1) {
+        if (prev <= step) {
           setIsActive(false);
           return 0;
         }
-        return prev - 1;
+        return prev - step;
       });
-      setWorkedSeconds((prev) => Math.min(totalPlannedSeconds, prev + 1));
+      setWorkedSeconds((prev) => Math.min(totalPlannedSeconds, prev + step));
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [isActive, showSummary, totalPlannedSeconds]);
+  }, [isActive, showSummary, simulationSpeed, testMode, totalPlannedSeconds]);
 
   useEffect(() => setActivityExpanded(false), [currentMomentIdx, currentSubIdx]);
+
+  useEffect(() => {
+    previousTimeRef.current = toSeconds(currentSub.duration || 0);
+  }, [currentMomentIdx, currentSubIdx, currentSub.duration]);
+
+  const playAlertTone = useCallback((kind = "soft") => {
+    if (settings.muteAll || !settings.soundAlerts || typeof window === "undefined") return;
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = kind === "critical" ? "square" : "sine";
+      oscillator.frequency.value = kind === "critical" ? 880 : 520;
+      gain.gain.value = settings.alertVolume === "bajo" ? 0.035 : 0.07;
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start();
+      oscillator.stop(ctx.currentTime + 0.12);
+    } catch (error) {}
+  }, [settings.alertVolume, settings.muteAll, settings.soundAlerts]);
+
+  useEffect(() => {
+    if (!isActive) {
+      previousTimeRef.current = timeLeft;
+      return;
+    }
+    const previous = previousTimeRef.current;
+    if (settings.earlyAlert && previous > 300 && timeLeft <= 300) playAlertTone("soft");
+    if (previous > 60 && timeLeft <= 60) playAlertTone("critical");
+    if (settings.beepLast15 && previous > 15 && timeLeft <= 15) playAlertTone("critical");
+    previousTimeRef.current = timeLeft;
+  }, [isActive, playAlertTone, settings.beepLast15, settings.earlyAlert, timeLeft]);
 
   useEffect(() => {
     setViewMode(settings.defaultClassView === "class" ? "class" : "teacher");
@@ -281,12 +338,13 @@ export default function ClassModePage({ params }) {
 
   const saveCurrentStatus = useCallback(
     (status) => {
+      if (testMode) return;
       if (currentSub?.id) updateSubmomentStatus(id, currentSub.id, status);
     },
-    [currentSub?.id, id],
+    [currentSub?.id, id, testMode],
   );
 
-  const goNext = useCallback(() => {
+  const goNext = useCallback((options = {}) => {
     if (!session) return;
     saveCurrentStatus("completed");
     setCompletedCount((count) => Math.min(totalActivities, count + 1));
@@ -294,7 +352,7 @@ export default function ClassModePage({ params }) {
       const next = currentMoment.submoments[currentSubIdx + 1];
       setCurrentSubIdx((idx) => idx + 1);
       setTimeLeft(toSeconds(next.duration || 0));
-      setIsActive(false);
+      setIsActive(Boolean(options.keepPlaying));
       return;
     }
     if (currentMomentIdx < moments.length - 1) {
@@ -302,12 +360,33 @@ export default function ClassModePage({ params }) {
       setCurrentMomentIdx((idx) => idx + 1);
       setCurrentSubIdx(0);
       setTimeLeft(toSeconds(next?.duration || 0));
-      setIsActive(false);
+      setIsActive(Boolean(options.keepPlaying));
       return;
     }
     setIsActive(false);
     setShowSummary(true);
   }, [currentMoment.submoments, currentMomentIdx, currentSubIdx, moments, saveCurrentStatus, session, totalActivities]);
+
+  useEffect(() => {
+    if (timeLeft !== 0 || showSummary || !session) return;
+    if (testScope === "moment") {
+      setIsActive(false);
+      return;
+    }
+    if (settings.autoAdvanceMoments && !settings.pauseAtMomentEnd && !isLastActivity) {
+      window.setTimeout(() => goNext({ keepPlaying: true }), 150);
+    }
+  }, [
+    goNext,
+    isLastActivity,
+    session,
+    settings.autoAdvanceMoments,
+    settings.pauseAtMomentEnd,
+    showSummary,
+    testMode,
+    testScope,
+    timeLeft,
+  ]);
 
   const goPrevious = () => {
     if (!session) return;
@@ -336,6 +415,39 @@ export default function ClassModePage({ params }) {
     setWorkedSeconds(0);
     setCompletedCount(0);
     setTimeLeft(toSeconds(moments?.[0]?.submoments?.[0]?.duration || 0));
+  };
+
+  const restartCurrentMoment = () => {
+    setIsActive(false);
+    setTimeLeft(toSeconds(currentSub.duration || 0));
+  };
+
+  const jumpToSeconds = (seconds) => {
+    setTimeLeft(Math.min(toSeconds(currentSub.duration || 0), seconds));
+    setIsActive(false);
+  };
+
+  const finishCurrentMoment = () => {
+    setTimeLeft(0);
+    setIsActive(false);
+  };
+
+  const startTestMode = () => {
+    setSettings({ testSpeed: simulationSpeed, prepareFullscreen });
+    setTestMode(true);
+    setShowPrepare(false);
+    window.history.replaceState(null, "", `/class-mode/${id}?test=1&speed=${simulationSpeed}&moment=${currentMomentIdx}`);
+  };
+
+  const startRealSession = async () => {
+    setSettings({ prepareFullscreen });
+    setShowPrepare(false);
+    if (prepareFullscreen && !document.fullscreenElement) await toggleFullscreen();
+  };
+
+  const exitTestMode = () => {
+    if (window.history.length > 1) window.history.back();
+    else window.location.href = "/sessions";
   };
 
   const toggleFullscreen = async () => {
@@ -380,7 +492,7 @@ export default function ClassModePage({ params }) {
     });
     const updated = { ...session, moments: nextMoments };
     setSession(updated);
-    saveSession(updated);
+    if (!testMode) saveSession(updated);
     setTimeLeft(toSeconds(nextMoments[currentMomentIdx]?.submoments?.[currentSubIdx]?.duration || 0));
     setShowLateStart(false);
     toast.success("Tiempos restantes redistribuidos");
@@ -427,6 +539,8 @@ export default function ClassModePage({ params }) {
           fullscreenMode={fullscreenMode}
           toggleFullscreen={toggleFullscreen}
           setShowLateStart={setShowLateStart}
+          testMode={testMode}
+          exitTestMode={exitTestMode}
         />
 
         <main className={`min-h-0 flex-1 px-3 py-2 md:px-5 md:py-3 ${viewMode === "class" ? "overflow-hidden" : "overflow-y-auto"}`}>
@@ -489,7 +603,41 @@ export default function ClassModePage({ params }) {
             />
           )}
         </main>
+        {testMode && (
+          <TestPanel
+            speed={simulationSpeed}
+            setSpeed={setSimulationSpeed}
+            scope={testScope}
+            setScope={setTestScope}
+            currentMoment={currentMoment}
+            currentMomentIdx={currentMomentIdx}
+            timeLeft={timeLeft}
+            restartCurrentMoment={restartCurrentMoment}
+            jumpToSeconds={jumpToSeconds}
+            finishCurrentMoment={finishCurrentMoment}
+            exitTestMode={exitTestMode}
+          />
+        )}
       </div>
+
+      {showPrepare && (
+        <PrepareSessionModal
+          session={session}
+          settings={settings}
+          moments={moments}
+          currentMomentIdx={currentMomentIdx}
+          setCurrentMomentIdx={setCurrentMomentIdx}
+          setCurrentSubIdx={setCurrentSubIdx}
+          setTimeLeft={setTimeLeft}
+          simulationSpeed={simulationSpeed}
+          setSimulationSpeed={setSimulationSpeed}
+          prepareFullscreen={prepareFullscreen}
+          setPrepareFullscreen={setPrepareFullscreen}
+          totalPlannedSeconds={totalPlannedSeconds}
+          startTestMode={startTestMode}
+          startRealSession={startRealSession}
+        />
+      )}
 
       {showLateStart && (
         <LateStartModal
@@ -527,6 +675,8 @@ function TopBar({
   fullscreenMode,
   toggleFullscreen,
   setShowLateStart,
+  testMode,
+  exitTestMode,
 }) {
   return (
     <header
@@ -547,17 +697,32 @@ function TopBar({
         </div>
       </div>
       <div className="flex items-center gap-2 overflow-x-auto">
+        {testMode && (
+          <span className="inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-xs font-black" style={{ backgroundColor: "var(--ca-accent)", color: "var(--ca-on-accent)" }}>
+            Modo de prueba
+          </span>
+        )}
         <ModeButton active={viewMode === "teacher"} onClick={() => setViewMode("teacher")} icon={<BookOpen size={14} />} label="Vista docente" />
         <ModeButton active={viewMode === "class"} onClick={() => setViewMode("class")} icon={<Eye size={14} />} label="Modo clase" />
         <ModeButton active={focusMode} onClick={() => setFocusMode((v) => !v)} icon={focusMode ? <EyeOff size={14} /> : <Eye size={14} />} label="Sin distracciones" />
         <ModeButton active={fullscreenMode} onClick={toggleFullscreen} icon={fullscreenMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />} label="Pantalla completa" />
         <button
           onClick={() => setShowLateStart(true)}
+          disabled={testMode}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition hover:brightness-110"
-          style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.14)", color: "#F59E0B" }}
+          style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.14)", color: "#F59E0B", opacity: testMode ? 0.45 : 1 }}
         >
           <AlertTriangle size={14} /> <span className="hidden sm:inline">Empecé tarde</span>
         </button>
+        {testMode && (
+          <button
+            onClick={exitTestMode}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition hover:brightness-110"
+            style={{ borderColor: "var(--cm-soft-border)", color: "var(--cm-text)", backgroundColor: "var(--cm-panel)" }}
+          >
+            Salir de prueba
+          </button>
+        )}
       </div>
     </header>
   );
@@ -943,6 +1108,129 @@ function MomentChips({ moments, currentMomentIdx }) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function TestPanel({
+  speed,
+  setSpeed,
+  scope,
+  setScope,
+  currentMoment,
+  currentMomentIdx,
+  timeLeft,
+  restartCurrentMoment,
+  jumpToSeconds,
+  finishCurrentMoment,
+  exitTestMode,
+}) {
+  const realSeconds = Math.ceil(timeLeft / Math.max(1, speed));
+
+  return (
+    <div className="relative z-20 border-t px-3 py-2 backdrop-blur-xl" style={{ backgroundColor: "var(--cm-panel-strong)", borderColor: "var(--cm-soft-border)", color: "var(--cm-text)" }}>
+      <div className="mx-auto flex max-w-7xl flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold" style={{ color: "var(--cm-muted)" }}>
+          <span className="rounded-full px-3 py-1 font-black" style={{ backgroundColor: "var(--ca-accent)", color: "var(--ca-on-accent)" }}>Modo de prueba</span>
+          <span>Velocidad: x{speed}</span>
+          <span>Momento simulado: {currentMomentIdx + 1}. {currentMoment?.name || "Momento"}</span>
+          <span>Equivale a {formatClock(realSeconds)} reales</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={speed} onChange={(event) => setSpeed(Number(event.target.value))} className="rounded-xl border px-2 py-2 text-xs font-black outline-none" style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)", color: "var(--cm-text)" }}>
+            {TEST_SPEEDS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+          <select value={scope} onChange={(event) => setScope(event.target.value)} className="rounded-xl border px-2 py-2 text-xs font-black outline-none" style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)", color: "var(--cm-text)" }}>
+            <option value="session">Probar sesión completa</option>
+            <option value="moment">Solo momento actual</option>
+          </select>
+          <TestButton onClick={restartCurrentMoment}>Reiniciar momento</TestButton>
+          <TestButton onClick={() => jumpToSeconds(300)}>Alerta temprana</TestButton>
+          <TestButton onClick={() => jumpToSeconds(60)}>Último minuto</TestButton>
+          <TestButton onClick={() => jumpToSeconds(15)}>Últimos 15 s</TestButton>
+          <TestButton onClick={finishCurrentMoment}>Finalizar momento</TestButton>
+          <TestButton onClick={exitTestMode}>Salir de prueba</TestButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TestButton({ children, onClick }) {
+  return (
+    <button onClick={onClick} className="rounded-xl border px-2.5 py-2 text-xs font-black transition hover:brightness-110" style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)", color: "var(--cm-text)" }}>
+      {children}
+    </button>
+  );
+}
+
+function PrepareSessionModal({
+  session,
+  settings,
+  moments,
+  currentMomentIdx,
+  setCurrentMomentIdx,
+  setCurrentSubIdx,
+  setTimeLeft,
+  simulationSpeed,
+  setSimulationSpeed,
+  prepareFullscreen,
+  setPrepareFullscreen,
+  totalPlannedSeconds,
+  startTestMode,
+  startRealSession,
+}) {
+  const chooseMoment = (idx) => {
+    const moment = moments[idx];
+    setCurrentMomentIdx(idx);
+    setCurrentSubIdx(0);
+    setTimeLeft(toSeconds(moment?.submoments?.[0]?.duration || 0));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-3xl border p-5 shadow-2xl" style={{ backgroundColor: "var(--cm-panel-strong)", borderColor: "var(--cm-soft-border)", color: "var(--cm-text)" }}>
+        <p className="text-xs font-black uppercase tracking-[0.25em]" style={{ color: "var(--ca-accent)" }}>Preparar sesión</p>
+        <h2 className="mt-2 text-2xl font-black">{session?.title || "Sesión"}</h2>
+        <p className="mt-1 text-sm" style={{ color: "var(--cm-muted)" }}>Revisa cómo correrá la clase antes de iniciar.</p>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <InfoLine label="Vista inicial" value={settings.defaultClassView === "class" ? "Modo clase" : "Vista docente"} />
+          <InfoLine label="Sonidos" value={settings.muteAll ? "Silenciados" : settings.soundAlerts ? `Activos · volumen ${settings.alertVolume || "medio"}` : "Desactivados"} />
+          <InfoLine label="Cambio automático" value={settings.autoAdvanceMoments ? "Sí" : "No"} />
+          <InfoLine label="Pausar al terminar" value={settings.pauseAtMomentEnd !== false ? "Sí" : "No"} />
+          <InfoLine label="Duración total" value={formatMinutes(totalPlannedSeconds)} />
+          <label className="rounded-2xl border p-3 text-sm font-bold" style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)" }}>
+            <span className="block text-xs uppercase tracking-wide" style={{ color: "var(--cm-muted)" }}>Momento inicial</span>
+            <select value={currentMomentIdx} onChange={(event) => chooseMoment(Number(event.target.value))} className="mt-2 w-full rounded-xl border px-2 py-2 outline-none" style={{ backgroundColor: "var(--cm-panel-strong)", borderColor: "var(--cm-soft-border)", color: "var(--cm-text)" }}>
+              {moments.map((moment, idx) => <option key={moment.id || idx} value={idx}>{idx + 1}. {moment.name}</option>)}
+            </select>
+          </label>
+          <label className="rounded-2xl border p-3 text-sm font-bold" style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)" }}>
+            <span className="block text-xs uppercase tracking-wide" style={{ color: "var(--cm-muted)" }}>Velocidad de prueba</span>
+            <select value={simulationSpeed} onChange={(event) => setSimulationSpeed(Number(event.target.value))} className="mt-2 w-full rounded-xl border px-2 py-2 outline-none" style={{ backgroundColor: "var(--cm-panel-strong)", borderColor: "var(--cm-soft-border)", color: "var(--cm-text)" }}>
+              {TEST_SPEEDS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
+          <button onClick={() => setPrepareFullscreen(!prepareFullscreen)} className="rounded-2xl border p-3 text-left text-sm font-bold" style={{ backgroundColor: prepareFullscreen ? "var(--ca-accent)" : "var(--cm-panel)", borderColor: prepareFullscreen ? "var(--ca-accent)" : "var(--cm-soft-border)", color: prepareFullscreen ? "var(--ca-on-accent)" : "var(--cm-text)" }}>
+            Pantalla completa: {prepareFullscreen ? "sí" : "no"}
+          </button>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <button onClick={startTestMode} className="rounded-2xl border px-5 py-3 text-sm font-black" style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)", color: "var(--cm-text)" }}>Probar sesión</button>
+          <button onClick={startRealSession} className="rounded-2xl px-5 py-3 text-sm font-black" style={{ backgroundColor: "var(--ca-accent)", color: "var(--ca-on-accent)" }}>Iniciar sesión real</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoLine({ label, value }) {
+  return (
+    <div className="rounded-2xl border p-3 text-sm font-bold" style={{ backgroundColor: "var(--cm-panel)", borderColor: "var(--cm-soft-border)" }}>
+      <span className="block text-xs uppercase tracking-wide" style={{ color: "var(--cm-muted)" }}>{label}</span>
+      <span>{value}</span>
     </div>
   );
 }

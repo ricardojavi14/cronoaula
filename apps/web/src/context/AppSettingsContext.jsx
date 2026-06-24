@@ -231,6 +231,9 @@ export const DEFAULT_SETTINGS = {
   alertAt3min: true,
   alertAt1min: true,
   alertAt30sec: false,
+  testSpeed: 10,
+  prepareFullscreen: false,
+  testStartMode: "first",
 
   teacherName: "",
   institution: "",
