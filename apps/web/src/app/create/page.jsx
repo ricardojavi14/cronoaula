@@ -26,7 +26,7 @@ import {
 import { useTeacher } from "../client-layout";
 import { MOMENT_TEMPLATES } from "@/data/templates";
 import { toast } from "sonner";
-import { saveSession } from "@/utils/localStore";
+import { getEditorReturnState, saveSession, saveTestDraftSession } from "@/utils/localStore";
 import { parseSessionText } from "@/utils/sessionParser";
 
 const MC = [
@@ -274,11 +274,27 @@ export default function CreateSessionPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [prev, setPrev] = useState(null);
   const [expandedPreviewActivities, setExpandedPreviewActivities] = useState({});
+  const restoredFromTestRef = useRef(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const p = new URLSearchParams(window.location.search);
       if (p.get("tab") === "import") setTab("import");
+      if (p.get("fromTest") === "1") {
+        const state = getEditorReturnState();
+        if (state) {
+          restoredFromTestRef.current = true;
+          setMeta(state.meta || meta);
+          setMoments(state.moments || []);
+          setTab(state.tab || "simple");
+          setIStep(state.iStep || "paste");
+          setITxt(state.iTxt || "");
+          setPrev(state.prev || null);
+          setExp(state.exp || {});
+          setCpFor(state.cpFor || null);
+          setTimeout(() => window.history.replaceState(null, "", state.url || "/create"), 0);
+        }
+      }
     }
   }, []);
 
@@ -298,6 +314,7 @@ export default function CreateSessionPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (restoredFromTestRef.current) return;
     const s = localStorage.getItem("cronoaula_draft");
     if (s && !meta.title && moments.length === 0) {
       try {
@@ -442,7 +459,40 @@ export default function CreateSessionPage() {
 
   const handleSave = async () => saveActiveSession();
   const handleTryClass = async () => saveActiveSession({ goToClass: true });
-  const handleTestClass = async () => saveActiveSession({ goToClass: true, testMode: true });
+  const handleTestClass = async (momentIdx = 0, scope = "session") => {
+    const draftMeta = {
+      ...activeMeta,
+      title: String(activeMeta.title || "").trim() || "Borrador de sesión",
+      total_duration: Number(activeDuration) || 0,
+    };
+    const draftMoments = activeMoments || [];
+    if (!draftMoments.length) return toast.error("Agrega al menos un momento para probar la sesión");
+    if (!draftMoments.some((moment) => calcMomentsTotal([moment]) > 0)) {
+      return toast.error("Asigna tiempo a los momentos antes de probar");
+    }
+    if (!Number(draftMeta.total_duration) || Number(draftMeta.total_duration) <= 0) {
+      return toast.error("Completa una duración válida para iniciar la prueba");
+    }
+    saveTestDraftSession(
+      {
+        ...draftMeta,
+        teacher_id: teacher?.id || "local-teacher",
+        moments: draftMoments,
+      },
+      {
+        meta,
+        moments,
+        tab,
+        iStep,
+        iTxt,
+        prev,
+        exp,
+        cpFor,
+        url: `${window.location.pathname}${window.location.search}`,
+      },
+    );
+    window.location.href = `/class-mode/draft?test=1&draft=1&moment=${Math.max(0, momentIdx)}&scope=${scope}`;
+  };
 
   const handleAnalyze = async () => {
     if (!iTxt.trim()) return toast.error("Pega el texto de tu planificación");
@@ -518,6 +568,7 @@ export default function CreateSessionPage() {
       addS={addS}
       remS={remS}
       updS={updS}
+      onTestMoment={(idx) => handleTestClass(idx, "moment")}
     />
   );
 
@@ -1274,11 +1325,11 @@ export default function CreateSessionPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleTestClass}
+              onClick={() => handleTestClass()}
               disabled={saving}
               className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-sm transition-colors"
             >
-              <Play size={15} /> Probar sesión
+              <Play size={15} /> Probar borrador
             </button>
             <button
               onClick={handleSave}
@@ -1419,11 +1470,11 @@ function SessionReviewPanel({
             <BookOpen size={15} /> Ver en modo clase
           </button>
           <button
-            onClick={onTestClass}
-            disabled={saving || !review.canSave}
+            onClick={() => onTestClass()}
+            disabled={saving}
             className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-black transition-colors"
           >
-            <Play size={15} /> Probar sesión
+            <Play size={15} /> Probar borrador
           </button>
         </div>
       </div>
@@ -1455,6 +1506,7 @@ function MomentsEditor({
   addS,
   remS,
   updS,
+  onTestMoment,
   showAdv = false,
 }) {
   const [expandedActivities, setExpandedActivities] = useState({});
@@ -1538,6 +1590,12 @@ function MomentsEditor({
                 {m.bgImage && (
                   <button onClick={() => updM(mi, "bgImage", "")} className="text-xs text-red-400 hover:text-red-600 shrink-0">Quitar fondo</button>
                 )}
+                <button
+                  onClick={() => onTestMoment?.(mi)}
+                  className="px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 text-xs font-semibold shrink-0"
+                >
+                  Probar este momento
+                </button>
                 <button
                   onClick={() => dupM(mi)}
                   className="p-1 rounded-lg hover:bg-white text-slate-400 hover:text-slate-600 transition-colors shrink-0"

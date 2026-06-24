@@ -2,6 +2,8 @@ export const CA_SESSIONS_KEY = "cronoaula_sessions";
 export const CA_TEACHER_KEY = "cronoaula_teacher";
 export const CA_OBS_KEY = "cronoaula_observations";
 export const CA_LAST_SESSION_KEY = "cronoaula_last_session";
+export const CA_TEST_DRAFT_KEY = "cronoaula_test_draft";
+export const CA_EDITOR_RETURN_KEY = "cronoaula_editor_return";
 
 export function makeId(prefix = "ca") {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -22,6 +24,22 @@ function readJson(key, fallback) {
 function writeJson(key, value) {
   if (typeof window === "undefined") return;
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function readSessionJson(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (error) {
+    console.error(`No se pudo leer ${key}`, error);
+    return fallback;
+  }
+}
+
+function writeSessionJson(key, value) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(key, JSON.stringify(value));
 }
 
 export function getTeacher() {
@@ -48,7 +66,34 @@ export function getSessions() {
 }
 
 export function getSession(id) {
+  if (String(id) === "draft") return getTestDraftSession();
   return getSessions().find((s) => String(s.id) === String(id)) || null;
+}
+
+export function saveTestDraftSession(session, editorState = {}) {
+  const draft = {
+    ...session,
+    id: "draft",
+    is_test_draft: true,
+    created_at: session.created_at || new Date().toISOString(),
+    last_modified: new Date().toISOString(),
+  };
+  writeSessionJson(CA_TEST_DRAFT_KEY, draft);
+  writeSessionJson(CA_EDITOR_RETURN_KEY, editorState);
+  return draft;
+}
+
+export function getTestDraftSession() {
+  return readSessionJson(CA_TEST_DRAFT_KEY, null);
+}
+
+export function getEditorReturnState() {
+  return readSessionJson(CA_EDITOR_RETURN_KEY, null);
+}
+
+export function clearTestDraftSession() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(CA_TEST_DRAFT_KEY);
 }
 
 export function setLastSessionId(id) {
